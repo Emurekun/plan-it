@@ -1,0 +1,146 @@
+import React, { useEffect, useState } from 'react';
+import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import Card from '../components/Card';
+import PrimaryButton from '../components/PrimaryButton';
+import { colors, spacing, typography } from '../theme/theme';
+import { Breakfast } from '../data/breakfasts';
+import { suggestBreakfast, getBreakfastById } from '../data/suggest';
+import {
+  loadPreferences,
+  loadTodaySuggestion,
+  saveTodaySuggestion,
+  resetOnboarding,
+  Preferences,
+} from '../storage/preferences';
+
+type Props = {
+  onEditPreferences: () => void;
+};
+
+const todayLabel = new Date().toLocaleDateString(undefined, {
+  weekday: 'long',
+  month: 'long',
+  day: 'numeric',
+});
+
+export default function TodayScreen({ onEditPreferences }: Props) {
+  const [preferences, setPreferences] = useState<Preferences | null>(null);
+  const [breakfast, setBreakfast] = useState<Breakfast | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const prefs = await loadPreferences();
+      if (!prefs) {
+        setLoading(false);
+        return;
+      }
+      setPreferences(prefs);
+
+      const savedId = await loadTodaySuggestion();
+      const existing = savedId ? getBreakfastById(savedId) : undefined;
+      const chosen = existing ?? suggestBreakfast(prefs);
+      setBreakfast(chosen);
+      await saveTodaySuggestion(chosen.id);
+      setLoading(false);
+    })();
+  }, []);
+
+  const handleAnother = async () => {
+    if (!preferences) return;
+    const next = suggestBreakfast(preferences, breakfast?.id);
+    setBreakfast(next);
+    await saveTodaySuggestion(next.id);
+  };
+
+  const handleEditPreferences = async () => {
+    await resetOnboarding();
+    onEditPreferences();
+  };
+
+  if (loading || !breakfast) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.centered}>
+          <Text style={typography.body}>Loading today's suggestion…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.header}>
+        <View>
+          <Text style={typography.label}>TODAY</Text>
+          <Text style={[typography.title, styles.dateText]}>{todayLabel}</Text>
+        </View>
+        <Pressable onPress={handleEditPreferences} hitSlop={12}>
+          <Text style={styles.editLink}>Edit preferences</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.body}>
+        <Text style={typography.label}>BREAKFAST SUGGESTION</Text>
+        <Card style={styles.card}>
+          <Text style={styles.emoji}>{breakfast.emoji}</Text>
+          <Text style={typography.heading}>{breakfast.name}</Text>
+          <Text style={[typography.body, styles.description]}>{breakfast.description}</Text>
+        </Card>
+
+        <PrimaryButton label="Give me another" onPress={handleAnother} style={styles.anotherButton} />
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: spacing.lg,
+    paddingTop: spacing.lg,
+  },
+  dateText: {
+    fontSize: 24,
+    marginTop: 2,
+  },
+  editLink: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+    marginTop: spacing.sm,
+  },
+  body: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+    justifyContent: 'center',
+  },
+  card: {
+    alignItems: 'center',
+    marginTop: spacing.md,
+    marginBottom: spacing.xl,
+  },
+  emoji: {
+    fontSize: 56,
+    marginBottom: spacing.sm,
+  },
+  description: {
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    color: colors.textMuted,
+  },
+  anotherButton: {
+    alignSelf: 'stretch',
+  },
+});
