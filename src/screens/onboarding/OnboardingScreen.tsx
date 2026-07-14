@@ -1,9 +1,18 @@
 import React, { useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import PrimaryButton from '../../components/PrimaryButton';
 import Chip from '../../components/Chip';
-import { colors, spacing, typography } from '../../theme/theme';
-import { DIET_OPTIONS, tagsForDiet } from '../../data/options';
+import { colors, radii, spacing, typography } from '../../theme/theme';
+import { DIET_OPTIONS } from '../../data/options';
+import { POPULAR_INGREDIENTS, searchIngredients } from '../../data/ingredients';
 import { DietType, savePreferences } from '../../storage/preferences';
 
 type Props = {
@@ -15,22 +24,14 @@ const STEP_COUNT = 4;
 export default function OnboardingScreen({ onComplete }: Props) {
   const [step, setStep] = useState(0);
   const [diet, setDiet] = useState<DietType | null>(null);
-  const [likes, setLikes] = useState<string[]>([]);
-  const [dislikes, setDislikes] = useState<string[]>([]);
+  const [have, setHave] = useState<string[]>([]);
+  const [avoid, setAvoid] = useState<string[]>([]);
+  const [haveQuery, setHaveQuery] = useState('');
+  const [avoidQuery, setAvoidQuery] = useState('');
   const [saving, setSaving] = useState(false);
 
   const toggle = (list: string[], setList: (v: string[]) => void, value: string) => {
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
-  };
-
-  // Only show foods compatible with the chosen diet (e.g. no eggs/cheese for vegans),
-  // and drop selections that became invalid after the user went back and changed diet.
-  const availableTags = tagsForDiet(diet);
-  const selectDiet = (value: DietType) => {
-    setDiet(value);
-    const validValues = tagsForDiet(value).map((t) => t.value);
-    setLikes((prev) => prev.filter((v) => validValues.includes(v)));
-    setDislikes((prev) => prev.filter((v) => validValues.includes(v)));
   };
 
   const goNext = () => setStep((s) => Math.min(s + 1, STEP_COUNT - 1));
@@ -39,9 +40,76 @@ export default function OnboardingScreen({ onComplete }: Props) {
   const finish = async () => {
     if (!diet) return;
     setSaving(true);
-    await savePreferences({ diet, likes, dislikes });
+    await savePreferences({
+      diet,
+      haveIngredients: have,
+      avoidIngredients: avoid,
+      likes: [],
+      dislikes: [],
+    });
     setSaving(false);
     onComplete();
+  };
+
+  const renderPicker = (
+    selected: string[],
+    setSelected: (v: string[]) => void,
+    query: string,
+    setQuery: (v: string) => void,
+    otherList: string[],
+    placeholder: string,
+  ) => {
+    const matches = query.trim()
+      ? searchIngredients(query)
+      : POPULAR_INGREDIENTS;
+    const suggestions = matches.filter(
+      (name) => !selected.includes(name) && !otherList.includes(name),
+    );
+
+    return (
+      <View style={styles.spacedTop}>
+        <TextInput
+          style={styles.search}
+          value={query}
+          onChangeText={setQuery}
+          placeholder={placeholder}
+          placeholderTextColor={colors.textMuted}
+          autoCorrect={false}
+        />
+
+        {selected.length > 0 && (
+          <View style={styles.selectedWrap}>
+            {selected.map((name) => (
+              <Chip
+                key={name}
+                label={`${name}  ✕`}
+                selected
+                onPress={() => toggle(selected, setSelected, name)}
+              />
+            ))}
+          </View>
+        )}
+
+        <Text style={[typography.label, styles.pickerLabel]}>
+          {query.trim() ? 'RESULTS' : 'POPULAR'}
+        </Text>
+        <View style={styles.optionList}>
+          {suggestions.map((name) => (
+            <Chip
+              key={name}
+              label={name}
+              selected={false}
+              onPress={() => toggle(selected, setSelected, name)}
+            />
+          ))}
+          {query.trim() && suggestions.length === 0 && (
+            <Text style={[typography.subtitle, styles.noMatch]}>
+              No match. You can pick from Popular or try another spelling.
+            </Text>
+          )}
+        </View>
+      </View>
+    );
   };
 
   return (
@@ -55,10 +123,12 @@ export default function OnboardingScreen({ onComplete }: Props) {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {step === 0 && (
           <View>
-            <Text style={styles.emoji}>🥐</Text>
+            <Text style={styles.emoji}>🧑‍🍳</Text>
             <Text style={typography.title}>Welcome to Plan It!</Text>
             <Text style={[typography.subtitle, styles.spacedTop]}>
-              Answer a few quick questions so we can suggest breakfasts you'll actually enjoy. This only takes a minute, and everything stays on your device.
+              Tell us what's in your kitchen and we'll suggest meals for breakfast, lunch, and
+              dinner that you can actually make. It only takes a minute, and everything stays on
+              your device.
             </Text>
           </View>
         )}
@@ -73,7 +143,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
                   key={opt.value}
                   label={opt.label}
                   selected={diet === opt.value}
-                  onPress={() => selectDiet(opt.value)}
+                  onPress={() => setDiet(opt.value)}
                 />
               ))}
             </View>
@@ -83,36 +153,36 @@ export default function OnboardingScreen({ onComplete }: Props) {
         {step === 2 && (
           <View>
             <Text style={typography.label}>STEP 2 OF 3</Text>
-            <Text style={[typography.heading, styles.spacedTop]}>What do you enjoy for breakfast?</Text>
-            <Text style={[typography.subtitle, styles.spacedTopSm]}>Pick as many as you like.</Text>
-            <View style={[styles.optionList, styles.spacedTop]}>
-              {availableTags.map((opt) => (
-                <Chip
-                  key={opt.value}
-                  label={opt.label}
-                  selected={likes.includes(opt.value)}
-                  onPress={() => toggle(likes, setLikes, opt.value)}
-                />
-              ))}
-            </View>
+            <Text style={[typography.heading, styles.spacedTop]}>Ingredients you have</Text>
+            <Text style={[typography.subtitle, styles.spacedTopSm]}>
+              Search and add what's in your kitchen. We'll suggest recipes that use them.
+            </Text>
+            {renderPicker(
+              have,
+              setHave,
+              haveQuery,
+              setHaveQuery,
+              avoid,
+              'Search ingredients (e.g. eggs, cheese)',
+            )}
           </View>
         )}
 
         {step === 3 && (
           <View>
             <Text style={typography.label}>STEP 3 OF 3</Text>
-            <Text style={[typography.heading, styles.spacedTop]}>Anything you'd rather avoid?</Text>
-            <Text style={[typography.subtitle, styles.spacedTopSm]}>We'll steer clear of these.</Text>
-            <View style={[styles.optionList, styles.spacedTop]}>
-              {availableTags.filter((opt) => !likes.includes(opt.value)).map((opt) => (
-                <Chip
-                  key={opt.value}
-                  label={opt.label}
-                  selected={dislikes.includes(opt.value)}
-                  onPress={() => toggle(dislikes, setDislikes, opt.value)}
-                />
-              ))}
-            </View>
+            <Text style={[typography.heading, styles.spacedTop]}>Ingredients to avoid</Text>
+            <Text style={[typography.subtitle, styles.spacedTopSm]}>
+              We'll skip recipes that contain these.
+            </Text>
+            {renderPicker(
+              avoid,
+              setAvoid,
+              avoidQuery,
+              setAvoidQuery,
+              have,
+              'Search ingredients to avoid',
+            )}
           </View>
         )}
       </ScrollView>
@@ -161,6 +231,9 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingTop: spacing.xl,
     flexGrow: 1,
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
   },
   emoji: {
     fontSize: 48,
@@ -176,10 +249,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
+  search: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    fontSize: 16,
+    color: colors.text,
+    marginBottom: spacing.md,
+  },
+  selectedWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: spacing.sm,
+  },
+  pickerLabel: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  noMatch: {
+    fontSize: 14,
+    marginTop: spacing.xs,
+  },
   footer: {
     flexDirection: 'row',
     padding: spacing.lg,
     gap: spacing.sm,
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
   },
   backButton: {
     flex: 1,
