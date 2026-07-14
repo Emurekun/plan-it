@@ -10,25 +10,10 @@ import {
 } from 'react-native';
 import Card from '../components/Card';
 import PrimaryButton from '../components/PrimaryButton';
-import RecipeModal from '../components/RecipeModal';
-import NutritionModal from '../components/NutritionModal';
 import MealRecipeModal from '../components/MealRecipeModal';
 import { colors, radii, spacing, typography } from '../theme/theme';
-import { Breakfast } from '../data/breakfasts';
-import { suggestBreakfast, getBreakfastById } from '../data/suggest';
-import { getRecipeById } from '../data/recipes';
-import { getMealNutrition } from '../data/mealNutrition';
-import { getBreakfastImage } from '../data/images';
-import { MealType, ApiMeal, suggestApiMeal } from '../data/mealdb';
-import {
-  loadPreferences,
-  loadTodaySuggestion,
-  saveTodaySuggestion,
-  loadSeenBreakfasts,
-  saveSeenBreakfasts,
-  resetOnboarding,
-  Preferences,
-} from '../storage/preferences';
+import { MealType, SpoonMeal, suggestMeals } from '../data/spoonacular';
+import { loadPreferences, resetOnboarding, Preferences } from '../storage/preferences';
 
 type Props = {
   onEditPreferences: () => void;
@@ -40,110 +25,104 @@ const MEAL_TYPES: { key: MealType; label: string }[] = [
   { key: 'dinner', label: 'Dinner' },
 ];
 
+const PAGE = 8;
+
+type Bucket = {
+  meals: SpoonMeal[];
+  index: number;
+  offset: number;
+  loading: boolean;
+  error: string | null;
+};
+
+const emptyBucket: Bucket = { meals: [], index: 0, offset: 0, loading: false, error: null };
+
 const todayLabel = new Date().toLocaleDateString(undefined, {
   weekday: 'long',
   month: 'long',
   day: 'numeric',
 });
 
+function fmt(v: number | null): string {
+  return v === null ? '—' : `${v}g`;
+}
+
 export default function TodayScreen({ onEditPreferences }: Props) {
   const [preferences, setPreferences] = useState<Preferences | null>(null);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [mealType, setMealType] = useState<MealType>('breakfast');
-
-  // Breakfast (curated catalog) state.
-  const [breakfast, setBreakfast] = useState<Breakfast | null>(null);
-  const [loading, setLoading] = useState(true);
   const [recipeVisible, setRecipeVisible] = useState(false);
-  const [nutritionVisible, setNutritionVisible] = useState(false);
-  const [seen, setSeen] = useState<string[]>([]);
-
-  // Lunch / Dinner (TheMealDB) state.
-  const [apiMeal, setApiMeal] = useState<ApiMeal | null>(null);
-  const [apiMealType, setApiMealType] = useState<MealType | null>(null);
-  const [apiLoading, setApiLoading] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
-  const [apiSeen, setApiSeen] = useState<{ lunch: string[]; dinner: string[] }>({
-    lunch: [],
-    dinner: [],
+  const [buckets, setBuckets] = useState<Record<MealType, Bucket>>({
+    breakfast: { ...emptyBucket },
+    lunch: { ...emptyBucket },
+    dinner: { ...emptyBucket },
   });
-  const [apiRecipeVisible, setApiRecipeVisible] = useState(false);
-  const reqRef = useRef(0);
+  const reqRef = useRef<Record<MealType, number>>({ breakfast: 0, lunch: 0, dinner: 0 });
 
-  const recipe = breakfast ? getRecipeById(breakfast.id) ?? null : null;
-  const nutrition = breakfast ? getMealNutrition(breakfast.id) : null;
-  const photo = breakfast ? getBreakfastImage(breakfast.id) : undefined;
-
-  useEffect(() => {
-    (async () => {
-      const prefs = await loadPreferences();
-      if (!prefs) {
-        setLoading(false);
-        return;
-      }
-      setPreferences(prefs);
-
-      const storedSeen = await loadSeenBreakfasts();
-      const savedId = await loadTodaySuggestion();
-      const existing = savedId ? getBreakfastById(savedId) : undefined;
-
-      if (existing) {
-        setBreakfast(existing);
-        setSeen(storedSeen);
-      } else {
-        const { breakfast: chosen, seen: nextSeen } = suggestBreakfast(prefs, storedSeen);
-        setBreakfast(chosen);
-        setSeen(nextSeen);
-        await saveSeenBreakfasts(nextSeen);
-        await saveTodaySuggestion(chosen.id);
-      }
-      setLoading(false);
-    })();
-  }, []);
-
-  const loadApi = useCallback(
-    async (type: MealType, prefs: Preferences | null, seedSeen: string[]) => {
-      const diet = prefs?.diet ?? 'none';
-      const id = ++reqRef.current;
-      setApiLoading(true);
-      setApiError(null);
+  const loadBatch = useCallback(
+    async (type: MealType, prefs: Preferences, offset: number, replace: boolean) => {
+      const id = reqRef.current[type] + 1;
+      reqRef.current[type] = id;
+      setBuckets((prev) => ({ ...prev, [type]: { ...prev[type], loading: true, error: null } }));
       try {
-        const { meal, seen: nextSeen } = await suggestApiMeal(type, diet, seedSeen);
-        if (reqRef.current !== id) return;
-        setApiMeal(meal);
-        setApiMealType(type);
-        setApiSeen((prev) => ({ ...prev, [type]: nextSeen }));
+        const meals = await suggestMeals({
+          mealType: type,
+          diet: prefs.diet,
+          have: prefs.haveIngredients ?? [],
+          avoid: prefs.avoidIngredients ?? [],
+          offset,
+        });
+        if (reqRef.current[type] !== id) return;
+        setBuckets((prev) => {
+          const cur = prev[type];
+          const merged = replace ? meals : [...cur.meals, ...meals];
+          const nextIndex = replace ? 0 : cur.meals.length;
+          return {
+            ...prev,
+            [type]: {
+              meals: merged,
+              index: merged.length ? Math.min(nextIndex, merged.length - 1) : 0,
+              offset,
+              loading: false,
+              error: merged.length ? null : 'No recipes matched. Try adjusting your ingredients.',
+            },
+          };
+        });
       } catch (e: any) {
-        if (reqRef.current !== id) return;
-        setApiMeal(null);
-        setApiError(e?.message ?? 'Could not load a suggestion.');
-      } finally {
-        if (reqRef.current === id) setApiLoading(false);
+        if (reqRef.current[type] !== id) return;
+        setBuckets((prev) => ({
+          ...prev,
+          [type]: { ...prev[type], loading: false, error: e?.message ?? 'Could not load suggestions.' },
+        }));
       }
     },
     [],
   );
 
+  useEffect(() => {
+    (async () => {
+      const prefs = await loadPreferences();
+      setPreferences(prefs);
+      setPrefsLoaded(true);
+      if (prefs) loadBatch('breakfast', prefs, 0, true);
+    })();
+  }, [loadBatch]);
+
   const selectMeal = (type: MealType) => {
     setMealType(type);
-    if (type !== 'breakfast' && apiMealType !== type) {
-      loadApi(type, preferences, apiSeen[type as 'lunch' | 'dinner']);
+    const b = buckets[type];
+    if (preferences && !b.loading && b.meals.length === 0) {
+      loadBatch(type, preferences, 0, true);
     }
   };
 
-  const handleBreakfastAnother = async () => {
-    if (!preferences) return;
-    const { breakfast: next, seen: nextSeen } = suggestBreakfast(preferences, seen, breakfast?.id);
-    setBreakfast(next);
-    setSeen(nextSeen);
-    await saveSeenBreakfasts(nextSeen);
-    await saveTodaySuggestion(next.id);
-  };
-
   const handleAnother = () => {
-    if (mealType === 'breakfast') {
-      handleBreakfastAnother();
+    if (!preferences) return;
+    const b = buckets[mealType];
+    if (b.index < b.meals.length - 1) {
+      setBuckets((prev) => ({ ...prev, [mealType]: { ...prev[mealType], index: prev[mealType].index + 1 } }));
     } else {
-      loadApi(mealType, preferences, apiSeen[mealType as 'lunch' | 'dinner']);
+      loadBatch(mealType, preferences, b.offset + PAGE, false);
     }
   };
 
@@ -152,15 +131,23 @@ export default function TodayScreen({ onEditPreferences }: Props) {
     onEditPreferences();
   };
 
-  if (loading || !breakfast) {
+  if (!prefsLoaded) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.centered}>
-          <Text style={typography.body}>Loading today's suggestion…</Text>
+          <ActivityIndicator color={colors.primary} size="large" />
         </View>
       </SafeAreaView>
     );
   }
+
+  const bucket = buckets[mealType];
+  const meal = bucket.meals[bucket.index] ?? null;
+  const n = meal?.nutrition ?? null;
+  const subtitleParts: string[] = [];
+  if (meal?.dishTypes[0]) subtitleParts.push(meal.dishTypes[0]);
+  if (meal?.readyInMinutes) subtitleParts.push(`${meal.readyInMinutes} min`);
+  const subtitle = subtitleParts.join(' · ');
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -184,108 +171,65 @@ export default function TodayScreen({ onEditPreferences }: Props) {
                 onPress={() => selectMeal(mt.key)}
                 style={[styles.segment, active && styles.segmentActive]}
               >
-                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
-                  {mt.label}
-                </Text>
+                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{mt.label}</Text>
               </Pressable>
             );
           })}
         </View>
 
-        <Text style={[typography.label, styles.suggestionLabel]}>
-          {mealType.toUpperCase()} SUGGESTION
-        </Text>
+        <Text style={[typography.label, styles.suggestionLabel]}>{mealType.toUpperCase()} SUGGESTION</Text>
 
-        {mealType === 'breakfast' ? (
-          <Pressable
-            onPress={() => recipe && setRecipeVisible(true)}
-            style={({ pressed }) => pressed && styles.cardPressed}
-          >
-            <Card style={styles.card}>
-              {photo ? (
-                <View style={styles.photoShadow}>
-                  <Image source={photo} style={styles.photo} resizeMode="cover" />
+        <Card style={styles.card}>
+          {bucket.loading ? (
+            <View style={styles.state}>
+              <ActivityIndicator color={colors.primary} size="large" />
+              <Text style={[typography.body, styles.stateText]}>Finding a recipe…</Text>
+            </View>
+          ) : bucket.error ? (
+            <View style={styles.state}>
+              <Text style={styles.emoji}>😕</Text>
+              <Text style={[typography.body, styles.stateText]}>{bucket.error}</Text>
+            </View>
+          ) : meal ? (
+            <Pressable
+              onPress={() => setRecipeVisible(true)}
+              style={({ pressed }) => pressed && styles.cardPressed}
+            >
+              <View style={styles.photoShadow}>
+                <Image source={{ uri: meal.image }} style={styles.photo} resizeMode="cover" />
+              </View>
+              <Text style={typography.heading}>{meal.title}</Text>
+              {subtitle ? <Text style={[typography.body, styles.description]}>{subtitle}</Text> : null}
+              {n && n.calories !== null && (
+                <View style={styles.nutriRow}>
+                  <Text style={styles.kcal}>{n.calories} kcal</Text>
+                  <Text style={styles.macros}>
+                    P {fmt(n.protein)} · C {fmt(n.carbs)} · F {fmt(n.fat)}
+                  </Text>
                 </View>
-              ) : (
-                <Text style={styles.emoji}>{breakfast.emoji}</Text>
               )}
-              <Text style={typography.heading}>{breakfast.name}</Text>
-              <Text style={[typography.body, styles.description]}>{breakfast.description}</Text>
               <View style={styles.pillRow}>
-                {recipe && (
-                  <View style={styles.recipeHint}>
-                    <Text style={styles.recipeHintText}>Tap for recipe 📖</Text>
-                  </View>
-                )}
-                {nutrition && (
-                  <Pressable
-                    onPress={() => setNutritionVisible(true)}
-                    style={({ pressed }) => [styles.recipeHint, pressed && styles.cardPressed]}
-                  >
-                    <Text style={styles.recipeHintText}>Nutrition 🥗</Text>
-                  </Pressable>
-                )}
-              </View>
-            </Card>
-          </Pressable>
-        ) : (
-          <Card style={styles.card}>
-            {apiLoading ? (
-              <View style={styles.apiState}>
-                <ActivityIndicator color={colors.primary} size="large" />
-                <Text style={[typography.body, styles.apiStateText]}>Finding a dish…</Text>
-              </View>
-            ) : apiError ? (
-              <View style={styles.apiState}>
-                <Text style={styles.emoji}>😕</Text>
-                <Text style={[typography.body, styles.apiStateText]}>{apiError}</Text>
-              </View>
-            ) : apiMeal ? (
-              <Pressable
-                onPress={() => setApiRecipeVisible(true)}
-                style={({ pressed }) => pressed && styles.cardPressed}
-              >
-                <View style={styles.photoShadow}>
-                  <Image source={{ uri: apiMeal.thumb }} style={styles.photo} resizeMode="cover" />
+                <View style={styles.recipeHint}>
+                  <Text style={styles.recipeHintText}>Tap for recipe 📖</Text>
                 </View>
-                <Text style={typography.heading}>{apiMeal.name}</Text>
-                <Text style={[typography.body, styles.description]}>
-                  {[apiMeal.category, apiMeal.area].filter(Boolean).join(' · ')}
-                </Text>
-                <View style={styles.pillRow}>
-                  <View style={styles.recipeHint}>
-                    <Text style={styles.recipeHintText}>Tap for recipe 📖</Text>
-                  </View>
-                </View>
-              </Pressable>
-            ) : (
-              <View style={styles.apiState}>
-                <Text style={[typography.body, styles.apiStateText]}>No suggestion yet.</Text>
               </View>
-            )}
-          </Card>
-        )}
+            </Pressable>
+          ) : (
+            <View style={styles.state}>
+              <Text style={[typography.body, styles.stateText]}>No suggestion yet.</Text>
+            </View>
+          )}
+        </Card>
 
-        <PrimaryButton label="Give me another" onPress={handleAnother} style={styles.anotherButton} />
+        <PrimaryButton
+          label="Give me another"
+          onPress={handleAnother}
+          disabled={bucket.loading}
+          style={styles.anotherButton}
+        />
       </View>
 
-      <RecipeModal
-        visible={recipeVisible}
-        breakfast={breakfast}
-        recipe={recipe}
-        onClose={() => setRecipeVisible(false)}
-      />
-      <NutritionModal
-        visible={nutritionVisible}
-        breakfast={breakfast}
-        nutrition={nutrition}
-        onClose={() => setNutritionVisible(false)}
-      />
-      <MealRecipeModal
-        visible={apiRecipeVisible}
-        meal={apiMeal}
-        onClose={() => setApiRecipeVisible(false)}
-      />
+      <MealRecipeModal visible={recipeVisible} meal={meal} onClose={() => setRecipeVisible(false)} />
     </SafeAreaView>
   );
 }
@@ -359,19 +303,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing.md,
     marginBottom: spacing.xl,
+    minHeight: 260,
+    justifyContent: 'center',
   },
   cardPressed: {
     opacity: 0.85,
   },
-  apiState: {
+  state: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.xl,
   },
-  apiStateText: {
+  stateText: {
     textAlign: 'center',
     marginTop: spacing.sm,
     color: colors.textMuted,
+  },
+  emoji: {
+    fontSize: 44,
+    marginBottom: spacing.sm,
+  },
+  description: {
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    color: colors.textMuted,
+    textTransform: 'capitalize',
+  },
+  nutriRow: {
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  kcal: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.primaryDark,
+  },
+  macros: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textMuted,
+    marginTop: 2,
   },
   pillRow: {
     flexDirection: 'row',
@@ -391,10 +362,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.primaryDark,
   },
-  emoji: {
-    fontSize: 56,
-    marginBottom: spacing.sm,
-  },
   photoShadow: {
     alignSelf: 'stretch',
     width: '100%',
@@ -411,11 +378,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 200,
     borderRadius: 16,
-  },
-  description: {
-    textAlign: 'center',
-    marginTop: spacing.sm,
-    color: colors.textMuted,
   },
   anotherButton: {
     alignSelf: 'stretch',
