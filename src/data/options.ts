@@ -7,19 +7,34 @@ export const DIET_OPTIONS: { value: DietType; label: string }[] = [
   { value: 'pescatarian', label: 'Pescatarian' },
 ];
 
-export const FOOD_TAGS: { value: string; label: string }[] = [
-  { value: 'eggs', label: 'Eggs' },
-  { value: 'bread', label: 'Bread & Toast' },
-  { value: 'avocado', label: 'Avocado' },
-  { value: 'yogurt', label: 'Yogurt' },
-  { value: 'fruit', label: 'Fruit' },
-  { value: 'oats', label: 'Oats' },
-  { value: 'cheese', label: 'Cheese' },
-  { value: 'bacon', label: 'Bacon & Sausage' },
-  { value: 'smoothie', label: 'Smoothies' },
-  { value: 'nuts', label: 'Nuts & Peanut Butter' },
-  { value: 'pancake', label: 'Pancakes & Waffles' },
-  { value: 'tofu', label: 'Tofu' },
-  { value: 'cereal', label: 'Cereal' },
-  { value: 'coffee', label: 'Coffee' },
+const ALL_DIETS: DietType[] = ['none', 'vegetarian', 'vegan', 'pescatarian'];
+const NON_VEGAN: DietType[] = ['none', 'vegetarian', 'pescatarian'];
+const MEAT_ONLY: DietType[] = ['none'];
+
+export type FoodTag = {
+  value: string;
+  label: string;
+  diets: DietType[];
+};
+
+export const FOOD_TAGS: FoodTag[] = [
+  { value: 'eggs', label: 'Eggs', diets: NON_VEGAN },
+  { value: 'bread', label: 'Bread & Toast', diets: ALL_DIETS },
+  { value: 'avocado', label: 'Avocado', diets: ALL_DIETS },
+  { value: 'yogurt', label: 'Yogurt', diets: NON_VEGAN },
+  { value: 'fruit', label: 'Fruit', diets: ALL_DIETS },
+  { value: 'oats', label: 'Oats', diets: ALL_DIETS },
+  { value: 'cheese', label: 'Cheese', diets: NON_VEGAN },
+  { value: 'bacon', label: 'Bacon & Sausage', diets: MEAT_ONLY },
+  { value: 'smoothie', label: 'Smoothies', diets: ALL_DIETS },
+  { value: 'nuts', label: 'Nuts & Peanut Butter', diets: ALL_DIETS },
+  { value: 'pancake', label: 'Pancakes & Waffles', diets: ALL_DIETS },
+  { value: 'tofu', label: 'Tofu', diets: ALL_DIETS },
+  { value: 'cereal', label: 'Cereal', diets: ALL_DIETS },
+  { value: 'coffee', label: 'Coffee', diets: ALL_DIETS },
 ];
+
+export function tagsForDiet(diet: DietType | null): FoodTag[] {
+  if (!diet) return FOOD_TAGS;
+  return FOOD_TAGS.filter((tag) => tag.diets.includes(diet));
+}

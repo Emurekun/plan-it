@@ -3,7 +3,7 @@ import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import PrimaryButton from '../../components/PrimaryButton';
 import Chip from '../../components/Chip';
 import { colors, spacing, typography } from '../../theme/theme';
-import { DIET_OPTIONS, FOOD_TAGS } from '../../data/options';
+import { DIET_OPTIONS, tagsForDiet } from '../../data/options';
 import { DietType, savePreferences } from '../../storage/preferences';
 
 type Props = {
@@ -21,6 +21,16 @@ export default function OnboardingScreen({ onComplete }: Props) {
 
   const toggle = (list: string[], setList: (v: string[]) => void, value: string) => {
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
+  };
+
+  // Only show foods compatible with the chosen diet (e.g. no eggs/cheese for vegans),
+  // and drop selections that became invalid after the user went back and changed diet.
+  const availableTags = tagsForDiet(diet);
+  const selectDiet = (value: DietType) => {
+    setDiet(value);
+    const validValues = tagsForDiet(value).map((t) => t.value);
+    setLikes((prev) => prev.filter((v) => validValues.includes(v)));
+    setDislikes((prev) => prev.filter((v) => validValues.includes(v)));
   };
 
   const goNext = () => setStep((s) => Math.min(s + 1, STEP_COUNT - 1));
@@ -63,7 +73,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
                   key={opt.value}
                   label={opt.label}
                   selected={diet === opt.value}
-                  onPress={() => setDiet(opt.value)}
+                  onPress={() => selectDiet(opt.value)}
                 />
               ))}
             </View>
@@ -76,7 +86,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
             <Text style={[typography.heading, styles.spacedTop]}>What do you enjoy for breakfast?</Text>
             <Text style={[typography.subtitle, styles.spacedTopSm]}>Pick as many as you like.</Text>
             <View style={[styles.optionList, styles.spacedTop]}>
-              {FOOD_TAGS.map((opt) => (
+              {availableTags.map((opt) => (
                 <Chip
                   key={opt.value}
                   label={opt.label}
@@ -94,7 +104,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
             <Text style={[typography.heading, styles.spacedTop]}>Anything you'd rather avoid?</Text>
             <Text style={[typography.subtitle, styles.spacedTopSm]}>We'll steer clear of these.</Text>
             <View style={[styles.optionList, styles.spacedTop]}>
-              {FOOD_TAGS.filter((opt) => !likes.includes(opt.value)).map((opt) => (
+              {availableTags.filter((opt) => !likes.includes(opt.value)).map((opt) => (
                 <Chip
                   key={opt.value}
                   label={opt.label}
