@@ -8,16 +8,42 @@ function getEligiblePool(preferences: Preferences): Breakfast[] {
   return noDislikes.length > 0 ? noDislikes : dietMatches;
 }
 
-export function suggestBreakfast(preferences: Preferences, excludeId?: string): Breakfast {
+function pickWeighted(candidates: Breakfast[], preferences: Preferences): Breakfast {
+  // Prefer breakfasts matching the user's likes; once those are used up in this
+  // cycle, the remaining ones become the candidates on their own.
+  const liked = candidates.filter((b) => b.tags.some((tag) => preferences.likes.includes(tag)));
+  const weighted = liked.length > 0 ? liked : candidates;
+  return weighted[Math.floor(Math.random() * weighted.length)];
+}
+
+export type Suggestion = {
+  breakfast: Breakfast;
+  seen: string[];
+};
+
+/**
+ * Picks the next breakfast, never repeating one already in `seenIds` until the
+ * whole eligible pool has been shown. Once exhausted, the cycle starts over
+ * (avoiding an immediate repeat of `currentId`).
+ */
+export function suggestBreakfast(
+  preferences: Preferences,
+  seenIds: string[] = [],
+  currentId?: string,
+): Suggestion {
   const pool = getEligiblePool(preferences);
-  const candidates = pool.length > 1 && excludeId ? pool.filter((b) => b.id !== excludeId) : pool;
-  const usable = candidates.length > 0 ? candidates : pool;
 
-  const liked = usable.filter((b) => b.tags.some((tag) => preferences.likes.includes(tag)));
-  const weighted = liked.length > 0 ? liked : usable;
+  let seen = seenIds.filter((id) => pool.some((b) => b.id === id));
+  let remaining = pool.filter((b) => !seen.includes(b.id));
 
-  const index = Math.floor(Math.random() * weighted.length);
-  return weighted[index];
+  if (remaining.length === 0) {
+    // Every eligible breakfast has been shown — start a fresh cycle.
+    seen = [];
+    remaining = pool.length > 1 && currentId ? pool.filter((b) => b.id !== currentId) : pool;
+  }
+
+  const breakfast = pickWeighted(remaining, preferences);
+  return { breakfast, seen: [...seen, breakfast.id] };
 }
 
 export function getBreakfastById(id: string): Breakfast | undefined {

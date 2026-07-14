@@ -11,6 +11,7 @@ export type Preferences = {
 const PREFERENCES_KEY = 'planit.preferences';
 const ONBOARDING_COMPLETE_KEY = 'planit.onboardingComplete';
 const TODAY_SUGGESTION_KEY = 'planit.todaySuggestion';
+const SEEN_KEY = 'planit.seenBreakfasts';
 
 export async function savePreferences(preferences: Preferences): Promise<void> {
   await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
@@ -28,7 +29,23 @@ export async function isOnboardingComplete(): Promise<boolean> {
 }
 
 export async function resetOnboarding(): Promise<void> {
-  await AsyncStorage.multiRemove([PREFERENCES_KEY, ONBOARDING_COMPLETE_KEY, TODAY_SUGGESTION_KEY]);
+  await AsyncStorage.multiRemove([
+    PREFERENCES_KEY,
+    ONBOARDING_COMPLETE_KEY,
+    TODAY_SUGGESTION_KEY,
+    SEEN_KEY,
+  ]);
+}
+
+// Ids already shown in the current cycle, so "give me another" never repeats
+// until every eligible breakfast has been seen.
+export async function loadSeenBreakfasts(): Promise<string[]> {
+  const raw = await AsyncStorage.getItem(SEEN_KEY);
+  return raw ? (JSON.parse(raw) as string[]) : [];
+}
+
+export async function saveSeenBreakfasts(ids: string[]): Promise<void> {
+  await AsyncStorage.setItem(SEEN_KEY, JSON.stringify(ids));
 }
 
 type TodaySuggestion = {

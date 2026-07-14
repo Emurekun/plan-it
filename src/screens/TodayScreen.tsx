@@ -12,6 +12,8 @@ import {
   loadPreferences,
   loadTodaySuggestion,
   saveTodaySuggestion,
+  loadSeenBreakfasts,
+  saveSeenBreakfasts,
   resetOnboarding,
   Preferences,
 } from '../storage/preferences';
@@ -31,6 +33,7 @@ export default function TodayScreen({ onEditPreferences }: Props) {
   const [breakfast, setBreakfast] = useState<Breakfast | null>(null);
   const [loading, setLoading] = useState(true);
   const [recipeVisible, setRecipeVisible] = useState(false);
+  const [seen, setSeen] = useState<string[]>([]);
 
   const recipe = breakfast ? getRecipeById(breakfast.id) ?? null : null;
   const photo = breakfast ? getBreakfastImage(breakfast.id) : undefined;
@@ -44,19 +47,30 @@ export default function TodayScreen({ onEditPreferences }: Props) {
       }
       setPreferences(prefs);
 
+      const storedSeen = await loadSeenBreakfasts();
       const savedId = await loadTodaySuggestion();
       const existing = savedId ? getBreakfastById(savedId) : undefined;
-      const chosen = existing ?? suggestBreakfast(prefs);
-      setBreakfast(chosen);
-      await saveTodaySuggestion(chosen.id);
+
+      if (existing) {
+        setBreakfast(existing);
+        setSeen(storedSeen);
+      } else {
+        const { breakfast: chosen, seen: nextSeen } = suggestBreakfast(prefs, storedSeen);
+        setBreakfast(chosen);
+        setSeen(nextSeen);
+        await saveSeenBreakfasts(nextSeen);
+        await saveTodaySuggestion(chosen.id);
+      }
       setLoading(false);
     })();
   }, []);
 
   const handleAnother = async () => {
     if (!preferences) return;
-    const next = suggestBreakfast(preferences, breakfast?.id);
+    const { breakfast: next, seen: nextSeen } = suggestBreakfast(preferences, seen, breakfast?.id);
     setBreakfast(next);
+    setSeen(nextSeen);
+    await saveSeenBreakfasts(nextSeen);
     await saveTodaySuggestion(next.id);
   };
 
