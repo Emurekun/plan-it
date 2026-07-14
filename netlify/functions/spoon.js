@@ -11,7 +11,7 @@
 // /.netlify/functions/spoon
 //
 // Usage: /.netlify/functions/spoon?path=recipes/findByIngredients&ingredients=bread,cheese&number=6
-// Every query param except `path` is forwarded to Spoonacular; `apiKey` is added
+// Every query param except "path" is forwarded to Spoonacular; "apiKey" is added
 // server-side.
 
 const CORS = {
@@ -25,7 +25,7 @@ exports.handler = async (event) => {
     return { statusCode: 204, headers: CORS, body: '' };
   }
 
-  const key = process.env.SPOONACULAR_API_KEY;
+  const key = (process.env.SPOONACULAR_API_KEY || '').trim();
   if (!key) {
     return {
       statusCode: 500,
@@ -36,12 +36,11 @@ exports.handler = async (event) => {
 
   const params = event.queryStringParameters || {};
   const path = String(params.path || '').replace(/^\/+/, '');
-  // Only allow known Spoonacular paths to be proxied.
   if (!path || !/^[a-zA-Z0-9/_-]+$/.test(path)) {
     return {
       statusCode: 400,
       headers: { ...CORS, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Missing or invalid "path" parameter.' }),
+      body: JSON.stringify({ error: 'Missing or invalid path parameter.' }),
     };
   }
 
@@ -51,7 +50,7 @@ exports.handler = async (event) => {
   }
   forwarded.set('apiKey', key);
 
-  const url = `https://api.spoonacular.com/${path}?${forwarded.toString()}`;
+  const url = 'https://api.spoonacular.com/' + path + '?' + forwarded.toString();
 
   try {
     const res = await fetch(url);
