@@ -1,33 +1,31 @@
 import React from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, radii, spacing, typography } from '../theme/theme';
-import { ApiMeal } from '../data/mealdb';
+import { SpoonMeal } from '../data/spoonacular';
 import PrimaryButton from './PrimaryButton';
 
 type Props = {
   visible: boolean;
-  meal: ApiMeal | null;
+  meal: SpoonMeal | null;
   onClose: () => void;
 };
 
-function toSteps(instructions: string): string[] {
-  if (!instructions) return [];
-  // Prefer explicit line breaks; fall back to sentence splitting.
-  const byLine = instructions
-    .split(/\r?\n+/)
-    .map((s) => s.replace(/^\s*(STEP\s*\d+[:.)-]?)/i, '').trim())
-    .filter((s) => s.length > 0);
-  if (byLine.length > 1) return byLine;
-  return instructions
-    .split(/(?<=\.)\s+(?=[A-Z])/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-}
+const MACROS: { key: 'protein' | 'carbs' | 'sugar' | 'fat' | 'fiber'; label: string; color: string }[] = [
+  { key: 'protein', label: 'Protein', color: '#2F7A54' },
+  { key: 'carbs', label: 'Carbs', color: '#C08A2D' },
+  { key: 'sugar', label: 'Sugar', color: '#C24E7A' },
+  { key: 'fat', label: 'Fat', color: '#C24E4E' },
+  { key: 'fiber', label: 'Fiber', color: '#6B8E23' },
+];
 
 export default function MealRecipeModal({ visible, meal, onClose }: Props) {
   if (!meal) return null;
-  const steps = toSteps(meal.instructions);
-  const subtitle = [meal.category, meal.area].filter(Boolean).join(' · ');
+  const subtitleParts: string[] = [];
+  if (meal.dishTypes[0]) subtitleParts.push(meal.dishTypes[0]);
+  if (meal.readyInMinutes) subtitleParts.push(`${meal.readyInMinutes} min`);
+  if (meal.servings) subtitleParts.push(`${meal.servings} servings`);
+  const subtitle = subtitleParts.join(' · ');
+  const n = meal.nutrition;
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -36,17 +34,35 @@ export default function MealRecipeModal({ visible, meal, onClose }: Props) {
         <View style={styles.sheet}>
           <View style={styles.handle} />
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-            {meal.thumb ? (
+            {meal.image ? (
               <View style={styles.photoShadow}>
-                <Image source={{ uri: meal.thumb }} style={styles.photo} resizeMode="cover" />
+                <Image source={{ uri: meal.image }} style={styles.photo} resizeMode="cover" />
               </View>
             ) : null}
-            <Text style={[typography.heading, styles.centered]}>{meal.name}</Text>
+            <Text style={[typography.heading, styles.centered]}>{meal.title}</Text>
             {subtitle ? (
               <Text style={[typography.subtitle, styles.centered, styles.descriptionSpacing]}>
                 {subtitle}
               </Text>
             ) : null}
+
+            {n && (n.calories !== null || n.protein !== null) && (
+              <View style={styles.nutritionCard}>
+                <View style={styles.calorieBlock}>
+                  <Text style={styles.calorieValue}>{n.calories ?? '—'}</Text>
+                  <Text style={styles.calorieUnit}>kcal per serving</Text>
+                </View>
+                <View style={styles.macroRow}>
+                  {MACROS.map((m) => (
+                    <View key={m.key} style={styles.macroItem}>
+                      <View style={[styles.macroDot, { backgroundColor: m.color }]} />
+                      <Text style={styles.macroLabel}>{m.label}</Text>
+                      <Text style={styles.macroValue}>{n[m.key] === null ? '—' : `${n[m.key]} g`}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
 
             {meal.ingredients.length > 0 && (
               <>
@@ -54,19 +70,16 @@ export default function MealRecipeModal({ visible, meal, onClose }: Props) {
                 {meal.ingredients.map((item, i) => (
                   <View key={i} style={styles.ingredientRow}>
                     <Text style={styles.bullet}>•</Text>
-                    <Text style={[typography.body, styles.listText]}>
-                      {item.measure ? `${item.measure} ` : ''}
-                      {item.name}
-                    </Text>
+                    <Text style={[typography.body, styles.listText]}>{item}</Text>
                   </View>
                 ))}
               </>
             )}
 
-            {steps.length > 0 && (
+            {meal.steps.length > 0 && (
               <>
                 <Text style={[typography.label, styles.sectionLabel]}>STEPS</Text>
-                {steps.map((step, i) => (
+                {meal.steps.map((step, i) => (
                   <View key={i} style={styles.stepRow}>
                     <View style={styles.stepNumber}>
                       <Text style={styles.stepNumberText}>{i + 1}</Text>
@@ -137,6 +150,55 @@ const styles = StyleSheet.create({
   },
   descriptionSpacing: {
     marginTop: spacing.xs,
+  },
+  nutritionCard: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.primarySoft,
+  },
+  calorieBlock: {
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  calorieValue: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: colors.primaryDark,
+  },
+  calorieUnit: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.primaryDark,
+    letterSpacing: 0.3,
+  },
+  macroRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  macroItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: spacing.sm,
+    marginVertical: spacing.xs / 2,
+  },
+  macroDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 4,
+  },
+  macroLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textMuted,
+    marginRight: 4,
+  },
+  macroValue: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.text,
   },
   sectionLabel: {
     marginTop: spacing.lg,
