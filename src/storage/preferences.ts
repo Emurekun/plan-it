@@ -4,6 +4,11 @@ export type DietType = 'none' | 'vegetarian' | 'vegan' | 'pescatarian';
 
 export type Preferences = {
   diet: DietType;
+  // Ingredient-based preferences drive the recipe suggestions.
+  // Optional so older code paths and stored data stay valid.
+  haveIngredients?: string[];
+  avoidIngredients?: string[];
+  // Legacy tag-based fields, kept for backward compatibility.
   likes: string[];
   dislikes: string[];
 };
@@ -20,7 +25,16 @@ export async function savePreferences(preferences: Preferences): Promise<void> {
 
 export async function loadPreferences(): Promise<Preferences | null> {
   const raw = await AsyncStorage.getItem(PREFERENCES_KEY);
-  return raw ? (JSON.parse(raw) as Preferences) : null;
+  if (!raw) return null;
+  const parsed = JSON.parse(raw) as Partial<Preferences>;
+  // Fill defaults so older stored preferences remain valid.
+  return {
+    diet: parsed.diet ?? 'none',
+    haveIngredients: parsed.haveIngredients ?? [],
+    avoidIngredients: parsed.avoidIngredients ?? [],
+    likes: parsed.likes ?? [],
+    dislikes: parsed.dislikes ?? [],
+  };
 }
 
 export async function isOnboardingComplete(): Promise<boolean> {
