@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   },
   photo: {
     width: '100%',
-    aspectRatio: 16 / 10,
+    height: 200,
     borderRadius: 16,
   },
   description: {
