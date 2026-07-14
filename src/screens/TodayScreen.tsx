@@ -174,6 +174,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     padding: spacing.lg,
     paddingTop: spacing.lg,
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
   },
   dateText: {
     fontSize: 24,
@@ -187,6 +190,9 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
     paddingHorizontal: spacing.lg,
     justifyContent: 'center',
   },
@@ -234,7 +240,7 @@ const styles = StyleSheet.create({
   },
   photo: {
     width: '100%',
-    height: 170,
+    aspectRatio: 16 / 10,
     borderRadius: 16,
   },
   description: {
