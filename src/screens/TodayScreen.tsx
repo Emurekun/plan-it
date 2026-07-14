@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import Card from '../components/Card';
 import PrimaryButton from '../components/PrimaryButton';
 import RecipeModal from '../components/RecipeModal';
@@ -7,6 +7,7 @@ import { colors, spacing, typography } from '../theme/theme';
 import { Breakfast } from '../data/breakfasts';
 import { suggestBreakfast, getBreakfastById } from '../data/suggest';
 import { getRecipeById } from '../data/recipes';
+import { getBreakfastImage } from '../data/images';
 import {
   loadPreferences,
   loadTodaySuggestion,
@@ -32,6 +33,7 @@ export default function TodayScreen({ onEditPreferences }: Props) {
   const [recipeVisible, setRecipeVisible] = useState(false);
 
   const recipe = breakfast ? getRecipeById(breakfast.id) ?? null : null;
+  const photo = breakfast ? getBreakfastImage(breakfast.id) : undefined;
 
   useEffect(() => {
     (async () => {
@@ -92,7 +94,13 @@ export default function TodayScreen({ onEditPreferences }: Props) {
           style={({ pressed }) => pressed && styles.cardPressed}
         >
           <Card style={styles.card}>
-            <Text style={styles.emoji}>{breakfast.emoji}</Text>
+            {photo ? (
+              <View style={styles.photoShadow}>
+                <Image source={photo} style={styles.photo} resizeMode="cover" />
+              </View>
+            ) : (
+              <Text style={styles.emoji}>{breakfast.emoji}</Text>
+            )}
             <Text style={typography.heading}>{breakfast.name}</Text>
             <Text style={[typography.body, styles.description]}>{breakfast.description}</Text>
             {recipe && (
@@ -171,6 +179,23 @@ const styles = StyleSheet.create({
   emoji: {
     fontSize: 56,
     marginBottom: spacing.sm,
+  },
+  photoShadow: {
+    alignSelf: 'stretch',
+    width: '100%',
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+    marginBottom: spacing.md,
+  },
+  photo: {
+    width: '100%',
+    height: 170,
+    borderRadius: 16,
   },
   description: {
     textAlign: 'center',

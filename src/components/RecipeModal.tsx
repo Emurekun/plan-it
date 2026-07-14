@@ -1,8 +1,9 @@
 import React from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, radii, spacing, typography } from '../theme/theme';
 import { Breakfast } from '../data/breakfasts';
 import { Recipe } from '../data/recipes';
+import { getBreakfastImage } from '../data/images';
 import PrimaryButton from './PrimaryButton';
 
 type Props = {
@@ -14,6 +15,7 @@ type Props = {
 
 export default function RecipeModal({ visible, breakfast, recipe, onClose }: Props) {
   if (!breakfast || !recipe) return null;
+  const photo = getBreakfastImage(breakfast.id);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -22,7 +24,13 @@ export default function RecipeModal({ visible, breakfast, recipe, onClose }: Pro
         <View style={styles.sheet}>
           <View style={styles.handle} />
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-            <Text style={styles.emoji}>{breakfast.emoji}</Text>
+            {photo ? (
+              <View style={styles.photoShadow}>
+                <Image source={photo} style={styles.photo} resizeMode="cover" />
+              </View>
+            ) : (
+              <Text style={styles.emoji}>{breakfast.emoji}</Text>
+            )}
             <Text style={[typography.heading, styles.centered]}>{breakfast.name}</Text>
             <Text style={[typography.subtitle, styles.centered, styles.descriptionSpacing]}>
               {breakfast.description}
@@ -85,6 +93,23 @@ const styles = StyleSheet.create({
     fontSize: 48,
     textAlign: 'center',
     marginBottom: spacing.sm,
+  },
+  photoShadow: {
+    alignSelf: 'stretch',
+    width: '100%',
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+    marginBottom: spacing.md,
+  },
+  photo: {
+    width: '100%',
+    height: 190,
+    borderRadius: 16,
   },
   centered: {
     textAlign: 'center',
