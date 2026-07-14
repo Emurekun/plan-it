@@ -3,10 +3,12 @@ import { Image, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-na
 import Card from '../components/Card';
 import PrimaryButton from '../components/PrimaryButton';
 import RecipeModal from '../components/RecipeModal';
+import NutritionModal from '../components/NutritionModal';
 import { colors, spacing, typography } from '../theme/theme';
 import { Breakfast } from '../data/breakfasts';
 import { suggestBreakfast, getBreakfastById } from '../data/suggest';
 import { getRecipeById } from '../data/recipes';
+import { getMealNutrition } from '../data/mealNutrition';
 import { getBreakfastImage } from '../data/images';
 import {
   loadPreferences,
@@ -33,9 +35,11 @@ export default function TodayScreen({ onEditPreferences }: Props) {
   const [breakfast, setBreakfast] = useState<Breakfast | null>(null);
   const [loading, setLoading] = useState(true);
   const [recipeVisible, setRecipeVisible] = useState(false);
+  const [nutritionVisible, setNutritionVisible] = useState(false);
   const [seen, setSeen] = useState<string[]>([]);
 
   const recipe = breakfast ? getRecipeById(breakfast.id) ?? null : null;
+  const nutrition = breakfast ? getMealNutrition(breakfast.id) : null;
   const photo = breakfast ? getBreakfastImage(breakfast.id) : undefined;
 
   useEffect(() => {
@@ -117,11 +121,21 @@ export default function TodayScreen({ onEditPreferences }: Props) {
             )}
             <Text style={typography.heading}>{breakfast.name}</Text>
             <Text style={[typography.body, styles.description]}>{breakfast.description}</Text>
-            {recipe && (
-              <View style={styles.recipeHint}>
-                <Text style={styles.recipeHintText}>Tap for recipe 📖</Text>
-              </View>
-            )}
+            <View style={styles.pillRow}>
+              {recipe && (
+                <View style={styles.recipeHint}>
+                  <Text style={styles.recipeHintText}>Tap for recipe 📖</Text>
+                </View>
+              )}
+              {nutrition && (
+                <Pressable
+                  onPress={() => setNutritionVisible(true)}
+                  style={({ pressed }) => [styles.recipeHint, pressed && styles.cardPressed]}
+                >
+                  <Text style={styles.recipeHintText}>Nutrition 🥗</Text>
+                </Pressable>
+              )}
+            </View>
           </Card>
         </Pressable>
 
@@ -133,6 +147,12 @@ export default function TodayScreen({ onEditPreferences }: Props) {
         breakfast={breakfast}
         recipe={recipe}
         onClose={() => setRecipeVisible(false)}
+      />
+      <NutritionModal
+        visible={nutritionVisible}
+        breakfast={breakfast}
+        nutrition={nutrition}
+        onClose={() => setNutritionVisible(false)}
       />
     </SafeAreaView>
   );
@@ -177,6 +197,12 @@ const styles = StyleSheet.create({
   },
   cardPressed: {
     opacity: 0.85,
+  },
+  pillRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
   recipeHint: {
     marginTop: spacing.md,
