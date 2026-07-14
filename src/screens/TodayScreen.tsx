@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import Card from '../components/Card';
 import PrimaryButton from '../components/PrimaryButton';
+import RecipeModal from '../components/RecipeModal';
 import { colors, spacing, typography } from '../theme/theme';
 import { Breakfast } from '../data/breakfasts';
 import { suggestBreakfast, getBreakfastById } from '../data/suggest';
+import { getRecipeById } from '../data/recipes';
 import {
   loadPreferences,
   loadTodaySuggestion,
@@ -27,6 +29,9 @@ export default function TodayScreen({ onEditPreferences }: Props) {
   const [preferences, setPreferences] = useState<Preferences | null>(null);
   const [breakfast, setBreakfast] = useState<Breakfast | null>(null);
   const [loading, setLoading] = useState(true);
+  const [recipeVisible, setRecipeVisible] = useState(false);
+
+  const recipe = breakfast ? getRecipeById(breakfast.id) ?? null : null;
 
   useEffect(() => {
     (async () => {
@@ -82,14 +87,31 @@ export default function TodayScreen({ onEditPreferences }: Props) {
 
       <View style={styles.body}>
         <Text style={typography.label}>BREAKFAST SUGGESTION</Text>
-        <Card style={styles.card}>
-          <Text style={styles.emoji}>{breakfast.emoji}</Text>
-          <Text style={typography.heading}>{breakfast.name}</Text>
-          <Text style={[typography.body, styles.description]}>{breakfast.description}</Text>
-        </Card>
+        <Pressable
+          onPress={() => recipe && setRecipeVisible(true)}
+          style={({ pressed }) => pressed && styles.cardPressed}
+        >
+          <Card style={styles.card}>
+            <Text style={styles.emoji}>{breakfast.emoji}</Text>
+            <Text style={typography.heading}>{breakfast.name}</Text>
+            <Text style={[typography.body, styles.description]}>{breakfast.description}</Text>
+            {recipe && (
+              <View style={styles.recipeHint}>
+                <Text style={styles.recipeHintText}>Tap for recipe 📖</Text>
+              </View>
+            )}
+          </Card>
+        </Pressable>
 
         <PrimaryButton label="Give me another" onPress={handleAnother} style={styles.anotherButton} />
       </View>
+
+      <RecipeModal
+        visible={recipeVisible}
+        breakfast={breakfast}
+        recipe={recipe}
+        onClose={() => setRecipeVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -130,6 +152,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing.md,
     marginBottom: spacing.xl,
+  },
+  cardPressed: {
+    opacity: 0.85,
+  },
+  recipeHint: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    paddingHorizontal: spacing.md,
+    borderRadius: 999,
+    backgroundColor: colors.primarySoft,
+  },
+  recipeHintText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primaryDark,
   },
   emoji: {
     fontSize: 56,
