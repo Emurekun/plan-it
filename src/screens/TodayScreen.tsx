@@ -13,7 +13,7 @@ import Card from '../components/Card';
 import PrimaryButton from '../components/PrimaryButton';
 import MealRecipeModal from '../components/MealRecipeModal';
 import { colors, radii, spacing, typography } from '../theme/theme';
-import { MealType, SpoonMeal, suggestMeals } from '../data/spoonacular';
+import { MealType, SpoonMeal, suggestMeals, loadMealDetails } from '../data/spoonacular';
 import { loadPreferences, resetOnboarding, Preferences } from '../storage/preferences';
 import { loadDayPlan, setPlannedMeal } from '../storage/dayPlan';
 
@@ -56,6 +56,8 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan }: Props) {
   const [mealType, setMealType] = useState<MealType>('breakfast');
   const [recipeVisible, setRecipeVisible] = useState(false);
   const [plannedIds, setPlannedIds] = useState<Partial<Record<MealType, number>>>({});
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
   const [buckets, setBuckets] = useState<Record<MealType, Bucket>>({
     breakfast: { ...emptyBucket },
     lunch: { ...emptyBucket },
@@ -112,8 +114,6 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan }: Props) {
     })();
   }, [loadBatch]);
 
-  // Keep the "Added" state in sync whenever the screen regains focus
-  // (e.g. after removing a meal on the Plan screen).
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -131,6 +131,37 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan }: Props) {
       };
     }, []),
   );
+
+  const bucket = buckets[mealType];
+  const meal = bucket.meals[bucket.index] ?? null;
+  const currentId = meal?.id ?? null;
+  const needsDetails = !!meal && !meal.detailsLoaded;
+
+  // Lazily load full details (ingredients / steps / nutrition) for the shown meal.
+  useEffect(() => {
+    if (!meal || meal.detailsLoaded) return;
+    let active = true;
+    setDetailsLoading(true);
+    setDetailsError(null);
+    loadMealDetails(meal)
+      .then((full) => {
+        if (!active) return;
+        setBuckets((prev) => {
+          const bb = prev[mealType];
+          return { ...prev, [mealType]: { ...bb, meals: bb.meals.map((x) => (x.id === full.id ? full : x)) } };
+        });
+      })
+      .catch((e: any) => {
+        if (active) setDetailsError(e?.message ?? 'Could not load details.');
+      })
+      .finally(() => {
+        if (active) setDetailsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mealType, currentId, needsDetails]);
 
   const selectMeal = (type: MealType) => {
     setMealType(type);
@@ -150,9 +181,9 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan }: Props) {
     }
   };
 
-  const handleAddToPlan = async (meal: SpoonMeal) => {
-    await setPlannedMeal(mealType, meal);
-    setPlannedIds((prev) => ({ ...prev, [mealType]: meal.id }));
+  const handleAddToPlan = async (m: SpoonMeal) => {
+    await setPlannedMeal(mealType, m);
+    setPlannedIds((prev) => ({ ...prev, [mealType]: m.id }));
   };
 
   const handleEditPreferences = async () => {
@@ -170,13 +201,13 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan }: Props) {
     );
   }
 
-  const bucket = buckets[mealType];
-  const meal = bucket.meals[bucket.index] ?? null;
   const n = meal?.nutrition ?? null;
   const planned = !!meal && plannedIds[mealType] === meal.id;
   const subtitleParts: string[] = [];
-  if (meal?.dishTypes[0]) subtitleParts.push(meal.dishTypes[0]);
-  if (meal?.readyInMinutes) subtitleParts.push(`${meal.readyInMinutes} min`);
+  if (meal?.detailsLoaded) {
+    if (meal.dishTypes[0]) subtitleParts.push(meal.dishTypes[0]);
+    if (meal.readyInMinutes) subtitleParts.push(`${meal.readyInMinutes} min`);
+  }
   const subtitle = subtitleParts.join(' · ');
 
   return (
@@ -228,36 +259,54 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan }: Props) {
           ) : meal ? (
             <View style={styles.mealWrap}>
               <Pressable
-                onPress={() => setRecipeVisible(true)}
-                style={({ pressed }) => [styles.mealTap, pressed && styles.cardPressed]}
+                onPress={() => meal.detailsLoaded && setRecipeVisible(true)}
+                style={({ pressed }) => [styles.mealTap, pressed && meal.detailsLoaded && styles.cardPressed]}
               >
                 <View style={styles.photoShadow}>
                   <Image source={{ uri: meal.image }} style={styles.photo} resizeMode="cover" />
                 </View>
                 <Text style={typography.heading}>{meal.title}</Text>
-                {subtitle ? <Text style={[typography.body, styles.description]}>{subtitle}</Text> : null}
-                {n && n.calories !== null && (
-                  <View style={styles.nutriRow}>
-                    <Text style={styles.kcal}>{n.calories} kcal</Text>
-                    <Text style={styles.macros}>
-                      P {fmt(n.protein)} · C {fmt(n.carbs)} · F {fmt(n.fat)}
-                    </Text>
+                {meal.detailsLoaded ? (
+                  <>
+                    {subtitle ? <Text style={[typography.body, styles.description]}>{subtitle}</Text> : null}
+                    {n && n.calories !== null && (
+                      <View style={styles.nutriRow}>
+                        <Text style={styles.kcal}>{n.calories} kcal</Text>
+                        <Text style={styles.macros}>
+                          P {fmt(n.protein)} · C {fmt(n.carbs)} · F {fmt(n.fat)}
+                        </Text>
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  <View style={styles.detailsLoading}>
+                    {detailsError ? (
+                      <Text style={[typography.body, styles.stateText]}>{detailsError}</Text>
+                    ) : (
+                      <>
+                        <ActivityIndicator color={colors.primary} />
+                        <Text style={styles.detailsLoadingText}>Loading details…</Text>
+                      </>
+                    )}
                   </View>
                 )}
               </Pressable>
-              <View style={styles.pillRow}>
-                <Pressable onPress={() => setRecipeVisible(true)} style={styles.recipeHint}>
-                  <Text style={styles.recipeHintText}>Tap for recipe 📖</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => handleAddToPlan(meal)}
-                  style={[styles.recipeHint, planned && styles.recipeHintDone]}
-                >
-                  <Text style={[styles.recipeHintText, planned && styles.recipeHintDoneText]}>
-                    {planned ? 'Added to plan ✓' : 'Add to plan ➕'}
-                  </Text>
-                </Pressable>
-              </View>
+
+              {meal.detailsLoaded && (
+                <View style={styles.pillRow}>
+                  <Pressable onPress={() => setRecipeVisible(true)} style={styles.recipeHint}>
+                    <Text style={styles.recipeHintText}>Tap for recipe 📖</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleAddToPlan(meal)}
+                    style={[styles.recipeHint, planned && styles.recipeHintDone]}
+                  >
+                    <Text style={[styles.recipeHintText, planned && styles.recipeHintDoneText]}>
+                      {planned ? 'Added to plan ✓' : 'Add to plan ➕'}
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
           ) : (
             <View style={styles.state}>
@@ -269,7 +318,7 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan }: Props) {
         <PrimaryButton
           label="Give me another"
           onPress={handleAnother}
-          disabled={bucket.loading}
+          disabled={bucket.loading || detailsLoading}
           style={styles.anotherButton}
         />
       </View>
@@ -384,6 +433,15 @@ const styles = StyleSheet.create({
   emoji: {
     fontSize: 44,
     marginBottom: spacing.sm,
+  },
+  detailsLoading: {
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  detailsLoadingText: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
   },
   description: {
     textAlign: 'center',
