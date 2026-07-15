@@ -8,15 +8,18 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import Card from '../components/Card';
 import PrimaryButton from '../components/PrimaryButton';
 import MealRecipeModal from '../components/MealRecipeModal';
 import { colors, radii, spacing, typography } from '../theme/theme';
 import { MealType, SpoonMeal, suggestMeals } from '../data/spoonacular';
 import { loadPreferences, resetOnboarding, Preferences } from '../storage/preferences';
+import { loadDayPlan, setPlannedMeal } from '../storage/dayPlan';
 
 type Props = {
   onEditPreferences: () => void;
+  onOpenPlan?: () => void;
 };
 
 const MEAL_TYPES: { key: MealType; label: string }[] = [
@@ -47,11 +50,12 @@ function fmt(v: number | null): string {
   return v === null ? '—' : `${v}g`;
 }
 
-export default function TodayScreen({ onEditPreferences }: Props) {
+export default function TodayScreen({ onEditPreferences, onOpenPlan }: Props) {
   const [preferences, setPreferences] = useState<Preferences | null>(null);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [mealType, setMealType] = useState<MealType>('breakfast');
   const [recipeVisible, setRecipeVisible] = useState(false);
+  const [plannedIds, setPlannedIds] = useState<Partial<Record<MealType, number>>>({});
   const [buckets, setBuckets] = useState<Record<MealType, Bucket>>({
     breakfast: { ...emptyBucket },
     lunch: { ...emptyBucket },
@@ -108,6 +112,26 @@ export default function TodayScreen({ onEditPreferences }: Props) {
     })();
   }, [loadBatch]);
 
+  // Keep the "Added" state in sync whenever the screen regains focus
+  // (e.g. after removing a meal on the Plan screen).
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      loadDayPlan().then((plan) => {
+        if (!active) return;
+        const ids: Partial<Record<MealType, number>> = {};
+        (Object.keys(plan) as MealType[]).forEach((k) => {
+          const m = plan[k];
+          if (m) ids[k] = m.id;
+        });
+        setPlannedIds(ids);
+      });
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
+
   const selectMeal = (type: MealType) => {
     setMealType(type);
     const b = buckets[type];
@@ -124,6 +148,11 @@ export default function TodayScreen({ onEditPreferences }: Props) {
     } else {
       loadBatch(mealType, preferences, b.offset + PAGE, false);
     }
+  };
+
+  const handleAddToPlan = async (meal: SpoonMeal) => {
+    await setPlannedMeal(mealType, meal);
+    setPlannedIds((prev) => ({ ...prev, [mealType]: meal.id }));
   };
 
   const handleEditPreferences = async () => {
@@ -144,6 +173,7 @@ export default function TodayScreen({ onEditPreferences }: Props) {
   const bucket = buckets[mealType];
   const meal = bucket.meals[bucket.index] ?? null;
   const n = meal?.nutrition ?? null;
+  const planned = !!meal && plannedIds[mealType] === meal.id;
   const subtitleParts: string[] = [];
   if (meal?.dishTypes[0]) subtitleParts.push(meal.dishTypes[0]);
   if (meal?.readyInMinutes) subtitleParts.push(`${meal.readyInMinutes} min`);
@@ -156,9 +186,14 @@ export default function TodayScreen({ onEditPreferences }: Props) {
           <Text style={typography.label}>TODAY</Text>
           <Text style={[typography.title, styles.dateText]}>{todayLabel}</Text>
         </View>
-        <Pressable onPress={handleEditPreferences} hitSlop={12}>
-          <Text style={styles.editLink}>Edit preferences</Text>
-        </Pressable>
+        <View style={styles.headerLinks}>
+          <Pressable onPress={onOpenPlan} hitSlop={8}>
+            <Text style={styles.link}>My plan →</Text>
+          </Pressable>
+          <Pressable onPress={handleEditPreferences} hitSlop={8}>
+            <Text style={styles.editLink}>Edit preferences</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.body}>
@@ -191,29 +226,39 @@ export default function TodayScreen({ onEditPreferences }: Props) {
               <Text style={[typography.body, styles.stateText]}>{bucket.error}</Text>
             </View>
           ) : meal ? (
-            <Pressable
-              onPress={() => setRecipeVisible(true)}
-              style={({ pressed }) => pressed && styles.cardPressed}
-            >
-              <View style={styles.photoShadow}>
-                <Image source={{ uri: meal.image }} style={styles.photo} resizeMode="cover" />
-              </View>
-              <Text style={typography.heading}>{meal.title}</Text>
-              {subtitle ? <Text style={[typography.body, styles.description]}>{subtitle}</Text> : null}
-              {n && n.calories !== null && (
-                <View style={styles.nutriRow}>
-                  <Text style={styles.kcal}>{n.calories} kcal</Text>
-                  <Text style={styles.macros}>
-                    P {fmt(n.protein)} · C {fmt(n.carbs)} · F {fmt(n.fat)}
-                  </Text>
+            <View style={styles.mealWrap}>
+              <Pressable
+                onPress={() => setRecipeVisible(true)}
+                style={({ pressed }) => [styles.mealTap, pressed && styles.cardPressed]}
+              >
+                <View style={styles.photoShadow}>
+                  <Image source={{ uri: meal.image }} style={styles.photo} resizeMode="cover" />
                 </View>
-              )}
+                <Text style={typography.heading}>{meal.title}</Text>
+                {subtitle ? <Text style={[typography.body, styles.description]}>{subtitle}</Text> : null}
+                {n && n.calories !== null && (
+                  <View style={styles.nutriRow}>
+                    <Text style={styles.kcal}>{n.calories} kcal</Text>
+                    <Text style={styles.macros}>
+                      P {fmt(n.protein)} · C {fmt(n.carbs)} · F {fmt(n.fat)}
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
               <View style={styles.pillRow}>
-                <View style={styles.recipeHint}>
+                <Pressable onPress={() => setRecipeVisible(true)} style={styles.recipeHint}>
                   <Text style={styles.recipeHintText}>Tap for recipe 📖</Text>
-                </View>
+                </Pressable>
+                <Pressable
+                  onPress={() => handleAddToPlan(meal)}
+                  style={[styles.recipeHint, planned && styles.recipeHintDone]}
+                >
+                  <Text style={[styles.recipeHintText, planned && styles.recipeHintDoneText]}>
+                    {planned ? 'Added to plan ✓' : 'Add to plan ➕'}
+                  </Text>
+                </Pressable>
               </View>
-            </Pressable>
+            </View>
           ) : (
             <View style={styles.state}>
               <Text style={[typography.body, styles.stateText]}>No suggestion yet.</Text>
@@ -254,15 +299,24 @@ const styles = StyleSheet.create({
     maxWidth: 480,
     alignSelf: 'center',
   },
+  headerLinks: {
+    alignItems: 'flex-end',
+  },
   dateText: {
     fontSize: 24,
     marginTop: 2,
   },
-  editLink: {
+  link: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.primary,
     marginTop: spacing.sm,
+  },
+  editLink: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textMuted,
+    marginTop: spacing.xs,
   },
   body: {
     flex: 1,
@@ -305,6 +359,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
     minHeight: 260,
     justifyContent: 'center',
+  },
+  mealWrap: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+  },
+  mealTap: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
   },
   cardPressed: {
     opacity: 0.85,
@@ -349,9 +411,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexWrap: 'wrap',
     gap: spacing.sm,
+    marginTop: spacing.md,
   },
   recipeHint: {
-    marginTop: spacing.md,
     paddingVertical: spacing.xs + 2,
     paddingHorizontal: spacing.md,
     borderRadius: 999,
@@ -361,6 +423,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: colors.primaryDark,
+  },
+  recipeHintDone: {
+    backgroundColor: colors.primary,
+  },
+  recipeHintDoneText: {
+    color: '#FFFFFF',
   },
   photoShadow: {
     alignSelf: 'stretch',
