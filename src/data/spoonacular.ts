@@ -1,8 +1,14 @@
 // Spoonacular-powered meal suggestions.
 //
 // Calls go through our Netlify serverless proxy (/.netlify/functions/spoon),
-// which injects the API key server-side and adds CORS headers. See
-// netlify/functions/spoon.js.
+// which injects the API key server-side and adds CORS headers.
+//
+// Point budget: Spoonacular's free tier is limited (~150 points/day), and
+// recipe information + nutrition are the expensive parts. To stay cheap we:
+//   1. Search with a plain complexSearch (no recipe info / nutrition) — this
+//      returns id + title + image for a whole batch for ~1 point.
+//   2. Load full details (ingredients, steps, nutrition) lazily, only for the
+//      meal actually shown, via recipes/{id}/information, and cache by id.
 
 import { DietType } from '../storage/preferences';
 
@@ -30,10 +36,10 @@ export type SpoonMeal = {
   ingredients: string[];
   steps: string[];
   nutrition: MealNutrition | null;
+  // Whether the expensive details (ingredients/steps/nutrition) are loaded.
+  detailsLoaded: boolean;
 };
 
-// Our meal types -> Spoonacular "type" values (it has no lunch/dinner concept,
-// so both map to main course).
 function spoonType(mealType: MealType): string {
   return mealType === 'breakfast' ? 'breakfast' : 'main course';
 }
@@ -45,7 +51,7 @@ function spoonDiet(diet: DietType): string | null {
     case 'vegan':
       return 'vegan';
     case 'pescatarian':
-      return 'pescetarian'; // Spoonacular spelling
+      return 'pescetarian';
     default:
       return null;
   }
@@ -86,25 +92,19 @@ function extractSteps(raw: any): string[] {
   return steps;
 }
 
-function mapMeal(raw: any): SpoonMeal {
-  const ingredients = Array.isArray(raw?.extendedIngredients)
+function extractIngredients(raw: any): string[] {
+  const list = Array.isArray(raw?.extendedIngredients)
     ? raw.extendedIngredients
         .map((i: any) => String(i?.original ?? i?.name ?? '').trim())
         .filter((s: string) => s.length > 0)
     : [];
-  // De-duplicate ingredient lines (Spoonacular sometimes repeats).
-  const uniqueIngredients = [...new Set(ingredients)];
-  return {
-    id: raw.id,
-    title: String(raw?.title ?? 'Untitled dish').trim(),
-    image: String(raw?.image ?? ''),
-    readyInMinutes: raw?.readyInMinutes ?? null,
-    servings: raw?.servings ?? null,
-    dishTypes: Array.isArray(raw?.dishTypes) ? raw.dishTypes : [],
-    ingredients: uniqueIngredients,
-    steps: extractSteps(raw),
-    nutrition: extractNutrition(raw),
-  };
+  return [...new Set(list)];
+}
+
+function limitError(status: number): Error | null {
+  if (status === 402) return new Error('Daily recipe limit reached. Try again tomorrow.');
+  if (status === 401) return new Error('Recipe service is misconfigured (API key).');
+  return null;
 }
 
 export type SuggestOptions = {
@@ -117,9 +117,8 @@ export type SuggestOptions = {
 };
 
 /**
- * Fetch a batch of meal suggestions matching the user's meal type, diet and
- * ingredients. Recipes that use more of the user's ingredients rank first;
- * recipes containing avoided ingredients are excluded by Spoonacular.
+ * Cheap search: returns a batch of lightweight meals (id + title + image).
+ * Ranking favors recipes that use more of the user's ingredients.
  */
 export async function suggestMeals(opts: SuggestOptions): Promise<SpoonMeal[]> {
   const { mealType, diet, have, avoid, offset = 0, signal } = opts;
@@ -136,25 +135,68 @@ export async function suggestMeals(opts: SuggestOptions): Promise<SpoonMeal[]> {
     params.set('sort', 'random');
   }
   if (avoid.length) params.set('excludeIngredients', avoid.join(','));
-  params.set('addRecipeInformation', 'true');
-  params.set('addRecipeNutrition', 'true');
-  params.set('fillIngredients', 'true');
-  params.set('instructionsRequired', 'true');
-  params.set('ignorePantry', 'true');
   params.set('number', String(BATCH_SIZE));
   params.set('offset', String(offset));
 
   const res = await fetch(`${PROXY}?${params.toString()}`, { signal });
   if (!res.ok) {
-    if (res.status === 402) {
-      throw new Error('Daily recipe limit reached. Try again tomorrow.');
-    }
-    if (res.status === 401) {
-      throw new Error('Recipe service is misconfigured (API key).');
-    }
+    const le = limitError(res.status);
+    if (le) throw le;
     throw new Error(`Could not load suggestions (${res.status}).`);
   }
   const json = (await res.json()) as { results?: any[] };
   const results = Array.isArray(json.results) ? json.results : [];
-  return results.map(mapMeal).filter((m) => m.image);
+  return results
+    .filter((r) => r && r.id && r.image)
+    .map((r) => ({
+      id: r.id,
+      title: String(r.title ?? 'Untitled dish').trim(),
+      image: String(r.image),
+      readyInMinutes: null,
+      servings: null,
+      dishTypes: [],
+      ingredients: [],
+      steps: [],
+      nutrition: null,
+      detailsLoaded: false,
+    }));
+}
+
+// Recipe details are immutable, so cache them for the session.
+const detailCache = new Map<number, SpoonMeal>();
+
+/**
+ * Lazily load full details (ingredients, steps, nutrition) for one meal.
+ * Cached by id so re-viewing a meal costs no extra API points.
+ */
+export async function loadMealDetails(meal: SpoonMeal, signal?: AbortSignal): Promise<SpoonMeal> {
+  if (meal.detailsLoaded) return meal;
+  const cached = detailCache.get(meal.id);
+  if (cached) return cached;
+
+  const params = new URLSearchParams();
+  params.set('path', `recipes/${meal.id}/information`);
+  params.set('includeNutrition', 'true');
+
+  const res = await fetch(`${PROXY}?${params.toString()}`, { signal });
+  if (!res.ok) {
+    const le = limitError(res.status);
+    if (le) throw le;
+    throw new Error(`Could not load recipe details (${res.status}).`);
+  }
+  const raw = await res.json();
+  const full: SpoonMeal = {
+    ...meal,
+    title: String(raw?.title ?? meal.title).trim(),
+    image: String(raw?.image ?? meal.image),
+    readyInMinutes: raw?.readyInMinutes ?? null,
+    servings: raw?.servings ?? null,
+    dishTypes: Array.isArray(raw?.dishTypes) ? raw.dishTypes : [],
+    ingredients: extractIngredients(raw),
+    steps: extractSteps(raw),
+    nutrition: extractNutrition(raw),
+    detailsLoaded: true,
+  };
+  detailCache.set(meal.id, full);
+  return full;
 }
