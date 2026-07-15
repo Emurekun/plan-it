@@ -4,12 +4,14 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 import TodayScreen from '../screens/TodayScreen';
+import PlanScreen from '../screens/PlanScreen';
 import { isOnboardingComplete } from '../storage/preferences';
 import { colors } from '../theme/theme';
 
 type RootStackParamList = {
   Onboarding: undefined;
   Main: undefined;
+  Plan: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -44,8 +46,14 @@ export default function RootNavigator() {
         </Stack.Screen>
         <Stack.Screen name="Main">
           {({ navigation }) => (
-            <TodayScreen onEditPreferences={() => navigation.replace('Onboarding')} />
+            <TodayScreen
+              onEditPreferences={() => navigation.replace('Onboarding')}
+              onOpenPlan={() => navigation.navigate('Plan')}
+            />
           )}
+        </Stack.Screen>
+        <Stack.Screen name="Plan">
+          {({ navigation }) => <PlanScreen onBack={() => navigation.goBack()} />}
         </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>
