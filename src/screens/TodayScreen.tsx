@@ -20,6 +20,7 @@ import { loadDayPlan, setPlannedMeal } from '../storage/dayPlan';
 type Props = {
   onEditPreferences: () => void;
   onOpenPlan?: () => void;
+  onOpenAccount?: () => void;
 };
 
 const MEAL_TYPES: { key: MealType; label: string }[] = [
@@ -50,7 +51,7 @@ function fmt(v: number | null): string {
   return v === null ? '—' : `${v}g`;
 }
 
-export default function TodayScreen({ onEditPreferences, onOpenPlan }: Props) {
+export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccount }: Props) {
   const [preferences, setPreferences] = useState<Preferences | null>(null);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [mealType, setMealType] = useState<MealType>('breakfast');
@@ -223,6 +224,9 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan }: Props) {
           </Pressable>
           <Pressable onPress={handleEditPreferences} hitSlop={8}>
             <Text style={styles.editLink}>Edit preferences</Text>
+          </Pressable>
+          <Pressable onPress={onOpenAccount} hitSlop={8}>
+            <Text style={styles.editLink}>Account</Text>
           </Pressable>
         </View>
       </View>
