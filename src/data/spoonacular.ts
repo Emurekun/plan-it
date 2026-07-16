@@ -106,8 +106,13 @@ export type SuggestOptions = {
 // "give me another" costs no extra requests.
 const poolCache = new Map<string, SpoonMeal[]>();
 
-async function fetchPool(opts: SuggestOptions): Promise<SpoonMeal[]> {
-  const { mealType, diet, have, avoid, signal } = opts;
+async function queryRecipes(
+  mealType: MealType,
+  diet: DietType,
+  have: string[],
+  avoid: string[],
+  signal?: AbortSignal,
+): Promise<Row[]> {
   const params = new URLSearchParams();
   params.set('select', 'id,name,category,area,thumb,instructions,ingredients,ing_text,nutrition');
   params.set('meal_types', `cs.{${mealType}}`);
@@ -116,17 +121,33 @@ async function fetchPool(opts: SuggestOptions): Promise<SpoonMeal[]> {
     const v = a.toLowerCase().replace(/[(),*%]/g, ' ').trim();
     if (v) params.append('ing_text', `not.ilike.*${v}*`);
   }
+  if (have.length) {
+    params.set('or', `(${have.map((h) => `ing_text.ilike.*${h}*`).join(',')})`);
+  }
+  params.set('limit', '150');
+  const res = await fetch(`${SUPA_URL}?${params.toString()}`, { headers: HEADERS, signal });
+  if (!res.ok) throw new Error(`Could not load recipes (${res.status}).`);
+  return (await res.json()) as Row[];
+}
+
+async function fetchPool(opts: SuggestOptions): Promise<SpoonMeal[]> {
+  const { mealType, diet, have, avoid, signal } = opts;
   const haveClean = have
     .map((h) => h.toLowerCase().replace(/[(),*%]/g, ' ').trim())
     .filter((h) => h.length > 1);
-  if (haveClean.length) {
-    params.set('or', `(${haveClean.map((h) => `ing_text.ilike.*${h}*`).join(',')})`);
-  }
-  params.set('limit', '150');
 
-  const res = await fetch(`${SUPA_URL}?${params.toString()}`, { headers: HEADERS, signal });
-  if (!res.ok) throw new Error(`Could not load recipes (${res.status}).`);
-  const rows = (await res.json()) as Row[];
+  // Staged relaxation: if the combined filters are too narrow (e.g. a vegan
+  // breakfast whose avoid-list excludes "coconut milk" via "milk"), widen the
+  // net instead of showing an empty state.
+  let rows = await queryRecipes(mealType, diet, haveClean, avoid, signal);
+  if (!rows.length && haveClean.length) {
+    rows = await queryRecipes(mealType, diet, [], avoid, signal);
+  }
+  if (!rows.length && diet !== 'none' && avoid.length) {
+    // The diet classification already excludes the big categories (meat, fish,
+    // dairy, eggs, honey), so dropping the avoid filter is a safe last resort.
+    rows = await queryRecipes(mealType, diet, [], [], signal);
+  }
 
   if (haveClean.length) {
     // Rank by how many of the user's ingredients each recipe uses.
