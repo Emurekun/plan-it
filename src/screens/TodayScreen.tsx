@@ -25,6 +25,7 @@ type Props = {
   onEditPreferences: () => void;
   onOpenPlan?: () => void;
   onOpenAccount?: () => void;
+  onChangeIngredients?: () => void;
   // Which day is being planned (0 = today). Set when arriving from the Plan
   // screen so the whole week can be planned day by day.
   dateOffset?: number;
@@ -66,7 +67,7 @@ function dayChipLabel(offset: number, date: Date): string {
   return date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
 }
 
-export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccount, dateOffset = 0 }: Props) {
+export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccount, onChangeIngredients, dateOffset = 0 }: Props) {
   const [preferences, setPreferences] = useState<Preferences | null>(null);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [mealType, setMealType] = useState<MealType>('breakfast');
@@ -133,6 +134,8 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
     })();
   }, [loadBatch]);
 
+  const prefsSigRef = useRef<string>('');
+
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -141,10 +144,28 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
         const meta = data.session?.user?.user_metadata as any;
         setNickname(meta?.nickname || data.session?.user?.email || null);
       });
+      // Re-read preferences on focus: if the user changed their ingredients
+      // (or other prefs), refresh the suggestions to match.
+      loadPreferences().then((prefs) => {
+        if (!active || !prefs) return;
+        const sig = JSON.stringify([prefs.diet, prefs.haveIngredients, prefs.avoidIngredients]);
+        if (prefsSigRef.current && sig !== prefsSigRef.current) {
+          prefsSigRef.current = sig;
+          setPreferences(prefs);
+          setBuckets({
+            breakfast: { ...emptyBucket },
+            lunch: { ...emptyBucket },
+            dinner: { ...emptyBucket },
+          });
+          loadBatch(mealType, prefs, 0, true);
+        } else if (!prefsSigRef.current) {
+          prefsSigRef.current = sig;
+        }
+      });
       return () => {
         active = false;
       };
-    }, []),
+    }, [mealType, loadBatch]),
   );
 
   const selectMeal = (type: MealType) => {
@@ -223,6 +244,9 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
           {nickname && <Text style={styles.nickname}>👤 {nickname}</Text>}
           <Pressable onPress={onOpenPlan} hitSlop={8}>
             <Text style={styles.link}>My plan →</Text>
+          </Pressable>
+          <Pressable onPress={onChangeIngredients} hitSlop={8}>
+            <Text style={styles.editLink}>Change ingredients</Text>
           </Pressable>
           <Pressable onPress={handleEditPreferences} hitSlop={8}>
             <Text style={styles.editLink}>Edit preferences</Text>
