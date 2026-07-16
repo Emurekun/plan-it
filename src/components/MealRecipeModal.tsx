@@ -50,7 +50,7 @@ export default function MealRecipeModal({ visible, meal, onClose }: Props) {
               <View style={styles.nutritionCard}>
                 <View style={styles.calorieBlock}>
                   <Text style={styles.calorieValue}>{n.calories ?? '—'}</Text>
-                  <Text style={styles.calorieUnit}>kcal per serving</Text>
+                  <Text style={styles.calorieUnit}>kcal per 100 g</Text>
                 </View>
                 <View style={styles.macroRow}>
                   {MACROS.map((m) => (
