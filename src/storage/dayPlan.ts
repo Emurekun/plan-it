@@ -1,67 +1,65 @@
-// Stores the meals the user has planned for the current day.
+// Date-keyed meal plans. Each planned meal stores the recipe plus how many
+// grams the user intends to eat, so daily calories are computed from the
+// per-100g nutrition values.
 //
-// Local-first: plans always persist on-device (AsyncStorage) so the app works
-// without an account. When the user is signed in, plans are also synced to
-// Supabase (day_plans table, RLS-protected), so they survive reinstalls and
-// follow the user across devices.
+// Local-first (AsyncStorage per date); synced to Supabase day_plans for
+// signed-in users (RLS: each user only sees their own rows).
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MealType, SpoonMeal } from '../data/spoonacular';
 import { supabase, getCurrentUserId } from '../data/supabaseClient';
 
-export type DayPlan = Partial<Record<MealType, SpoonMeal>>;
-
-type StoredPlan = {
-  date: string;
-  meals: DayPlan;
+export type PlannedMeal = {
+  meal: SpoonMeal;
+  grams: number;
 };
 
-const KEY = 'planit.dayPlan';
+export type DayPlan = Partial<Record<MealType, PlannedMeal>>;
 
-function today(): string {
-  return new Date().toDateString();
-}
+const KEY_PREFIX = 'planit.dayPlan.v2.';
 
-function todayISO(): string {
-  const d = new Date();
+export function isoDate(d: Date = new Date()): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
-async function loadLocal(): Promise<DayPlan> {
-  const raw = await AsyncStorage.getItem(KEY);
+export function addDays(base: Date, days: number): Date {
+  const d = new Date(base);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+async function loadLocal(dateISO: string): Promise<DayPlan> {
+  const raw = await AsyncStorage.getItem(KEY_PREFIX + dateISO);
   if (!raw) return {};
   try {
-    const parsed = JSON.parse(raw) as StoredPlan;
-    if (parsed.date !== today()) return {};
-    return parsed.meals ?? {};
+    return (JSON.parse(raw) as DayPlan) ?? {};
   } catch {
     return {};
   }
 }
 
-async function persistLocal(meals: DayPlan): Promise<void> {
-  const payload: StoredPlan = { date: today(), meals };
-  await AsyncStorage.setItem(KEY, JSON.stringify(payload));
+async function persistLocal(dateISO: string, meals: DayPlan): Promise<void> {
+  await AsyncStorage.setItem(KEY_PREFIX + dateISO, JSON.stringify(meals));
 }
 
-async function pushCloud(meals: DayPlan): Promise<void> {
+async function pushCloud(dateISO: string, meals: DayPlan): Promise<void> {
   try {
     const userId = await getCurrentUserId();
     if (!userId) return;
     await supabase.from('day_plans').upsert({
       user_id: userId,
-      plan_date: todayISO(),
+      plan_date: dateISO,
       meals,
       updated_at: new Date().toISOString(),
     });
   } catch {
-    // Cloud sync is best-effort; local copy is the source of truth offline.
+    // Cloud sync is best-effort; the local copy still works offline.
   }
 }
 
-async function pullCloud(): Promise<DayPlan | null> {
+async function pullCloud(dateISO: string): Promise<DayPlan | null> {
   try {
     const userId = await getCurrentUserId();
     if (!userId) return null;
@@ -69,7 +67,7 @@ async function pullCloud(): Promise<DayPlan | null> {
       .from('day_plans')
       .select('meals')
       .eq('user_id', userId)
-      .eq('plan_date', todayISO())
+      .eq('plan_date', dateISO)
       .maybeSingle();
     if (error || !data) return null;
     return (data.meals as DayPlan) ?? null;
@@ -78,30 +76,33 @@ async function pullCloud(): Promise<DayPlan | null> {
   }
 }
 
-// Returns today's plan. Signed-in users get their cloud copy (which also
-// refreshes the local cache); guests get the on-device copy.
-export async function loadDayPlan(): Promise<DayPlan> {
-  const cloud = await pullCloud();
+export async function loadDayPlan(dateISO: string): Promise<DayPlan> {
+  const cloud = await pullCloud(dateISO);
   if (cloud && Object.keys(cloud).length > 0) {
-    await persistLocal(cloud);
+    await persistLocal(dateISO, cloud);
     return cloud;
   }
-  return loadLocal();
+  return loadLocal(dateISO);
 }
 
-export async function setPlannedMeal(mealType: MealType, meal: SpoonMeal): Promise<DayPlan> {
-  const current = await loadDayPlan();
-  const next: DayPlan = { ...current, [mealType]: meal };
-  await persistLocal(next);
-  await pushCloud(next);
+export async function setPlannedMeal(
+  dateISO: string,
+  mealType: MealType,
+  meal: SpoonMeal,
+  grams: number,
+): Promise<DayPlan> {
+  const current = await loadDayPlan(dateISO);
+  const next: DayPlan = { ...current, [mealType]: { meal, grams } };
+  await persistLocal(dateISO, next);
+  await pushCloud(dateISO, next);
   return next;
 }
 
-export async function removePlannedMeal(mealType: MealType): Promise<DayPlan> {
-  const current = await loadDayPlan();
+export async function removePlannedMeal(dateISO: string, mealType: MealType): Promise<DayPlan> {
+  const current = await loadDayPlan(dateISO);
   const next: DayPlan = { ...current };
   delete next[mealType];
-  await persistLocal(next);
-  await pushCloud(next);
+  await persistLocal(dateISO, next);
+  await pushCloud(dateISO, next);
   return next;
 }
