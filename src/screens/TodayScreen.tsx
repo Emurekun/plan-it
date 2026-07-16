@@ -25,6 +25,9 @@ type Props = {
   onEditPreferences: () => void;
   onOpenPlan?: () => void;
   onOpenAccount?: () => void;
+  // Which day is being planned (0 = today). Set when arriving from the Plan
+  // screen so the whole week can be planned day by day.
+  dateOffset?: number;
 };
 
 const MEAL_TYPES: { key: MealType; label: string }[] = [
@@ -45,11 +48,13 @@ type Bucket = {
 
 const emptyBucket: Bucket = { meals: [], index: 0, offset: 0, loading: false, error: null };
 
-const todayLabel = new Date().toLocaleDateString('en-US', {
-  weekday: 'long',
-  month: 'long',
-  day: 'numeric',
-});
+function dateTitle(d: Date): string {
+  return d.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+}
 
 function fmt(v: number | null): string {
   return v === null ? '—' : `${v}g`;
@@ -61,7 +66,7 @@ function dayChipLabel(offset: number, date: Date): string {
   return date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
 }
 
-export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccount }: Props) {
+export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccount, dateOffset = 0 }: Props) {
   const [preferences, setPreferences] = useState<Preferences | null>(null);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [mealType, setMealType] = useState<MealType>('breakfast');
@@ -167,7 +172,7 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
 
   const openAddModal = () => {
     setGramsText('250');
-    setTargetOffset(0);
+    setTargetOffset(dateOffset);
     setAddVisible(true);
   };
 
@@ -209,8 +214,10 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <View>
-          <Text style={typography.label}>TODAY</Text>
-          <Text style={[typography.title, styles.dateText]}>{todayLabel}</Text>
+          <Text style={typography.label}>{dateOffset === 0 ? 'TODAY' : 'PLANNING'}</Text>
+          <Text style={[typography.title, styles.dateText]}>
+            {dateTitle(addDays(new Date(), dateOffset))}
+          </Text>
         </View>
         <View style={styles.headerLinks}>
           {nickname && <Text style={styles.nickname}>👤 {nickname}</Text>}

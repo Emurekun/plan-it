@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import Card from '../components/Card';
+import PrimaryButton from '../components/PrimaryButton';
 import MealRecipeModal from '../components/MealRecipeModal';
 import { colors, radii, spacing, typography } from '../theme/theme';
 import { MealType, SpoonMeal } from '../data/spoonacular';
@@ -16,6 +17,9 @@ import { DayPlan, loadDayPlan, removePlannedMeal, isoDate, addDays } from '../st
 
 type Props = {
   onBack: () => void;
+  // Opens the suggestion screen targeted at the given day offset, so the whole
+  // week can be planned day by day.
+  onPlanDay?: (offset: number) => void;
 };
 
 const SLOTS: { key: MealType; label: string; emoji: string }[] = [
@@ -52,7 +56,7 @@ function eatenField(
   return Math.round(total * 10) / 10;
 }
 
-export default function PlanScreen({ onBack }: Props) {
+export default function PlanScreen({ onBack, onPlanDay }: Props) {
   const [dayOffset, setDayOffset] = useState(0);
   const [plan, setPlan] = useState<DayPlan>({});
   const [loading, setLoading] = useState(true);
@@ -140,10 +144,18 @@ export default function PlanScreen({ onBack }: Props) {
             {loading
               ? 'Loading…'
               : plannedCount === 0
-                ? 'Nothing planned for this day yet. Add meals from the Today screen.'
+                ? 'Nothing planned for this day yet.'
                 : `${plannedCount} of 3 meals planned`}
           </Text>
         </Card>
+
+        {onPlanDay && (
+          <PrimaryButton
+            label={`Pick meals for ${dayOffset === 0 ? 'today' : dayOffset === 1 ? 'tomorrow' : selectedDate.toLocaleDateString('en-US', { weekday: 'long' })} →`}
+            onPress={() => onPlanDay(dayOffset)}
+            style={styles.planDayButton}
+          />
+        )}
 
         {SLOTS.map((slot) => {
           const entry = plan[slot.key];
@@ -265,6 +277,9 @@ const styles = StyleSheet.create({
   totalCard: {
     alignItems: 'center',
     backgroundColor: colors.primary,
+    marginBottom: spacing.md,
+  },
+  planDayButton: {
     marginBottom: spacing.lg,
   },
   totalLabel: {
