@@ -14,7 +14,7 @@ import { colors } from '../theme/theme';
 type RootStackParamList = {
   Auth: undefined;
   Onboarding: undefined;
-  Main: undefined;
+  Main: { dateOffset?: number } | undefined;
   Plan: undefined;
   Account: undefined;
 };
@@ -70,8 +70,9 @@ export default function RootNavigator() {
         ) : (
           <>
             <Stack.Screen name="Main">
-              {({ navigation }) => (
+              {({ navigation, route }) => (
                 <TodayScreen
+                  dateOffset={route.params?.dateOffset ?? 0}
                   onEditPreferences={() => setOnboarded(false)}
                   onOpenPlan={() => navigation.navigate('Plan')}
                   onOpenAccount={() => navigation.navigate('Account')}
@@ -79,7 +80,12 @@ export default function RootNavigator() {
               )}
             </Stack.Screen>
             <Stack.Screen name="Plan">
-              {({ navigation }) => <PlanScreen onBack={() => navigation.goBack()} />}
+              {({ navigation }) => (
+                <PlanScreen
+                  onBack={() => navigation.goBack()}
+                  onPlanDay={(offset) => navigation.navigate('Main', { dateOffset: offset })}
+                />
+              )}
             </Stack.Screen>
             <Stack.Screen name="Account">
               {({ navigation }) => <AuthScreen onBack={() => navigation.goBack()} />}
