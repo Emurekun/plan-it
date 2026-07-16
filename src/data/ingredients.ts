@@ -1,15 +1,13 @@
 // Curated list of common cooking ingredients for the onboarding pickers
 // ("ingredients you have" and "ingredients to avoid"). Names are plain and
-// title-cased so they read well as chips and work as free-text queries for the
-// recipe API. POPULAR_INGREDIENTS are shown as quick picks before searching.
+// title-cased so they read well as chips and work as free-text queries.
+// Quick picks are diet-aware: vegans see vegan staples, vegetarians see
+// vegetarian ones, etc. The search always covers the full list.
 
-export const POPULAR_INGREDIENTS: string[] = [
-  'Egg',
+import { DietType } from '../storage/preferences';
+
+const POPULAR_BASE: string[] = [
   'Bread',
-  'Cheese',
-  'Milk',
-  'Butter',
-  'Chicken',
   'Rice',
   'Pasta',
   'Tomato',
@@ -18,8 +16,6 @@ export const POPULAR_INGREDIENTS: string[] = [
   'Potato',
   'Avocado',
   'Olive Oil',
-  'Beef',
-  'Yogurt',
   'Banana',
   'Oats',
   'Spinach',
@@ -27,8 +23,47 @@ export const POPULAR_INGREDIENTS: string[] = [
   'Bell Pepper',
   'Carrot',
   'Lemon',
+];
+
+const POPULAR_VEGAN_EXTRAS: string[] = [
+  'Tofu',
+  'Chickpeas',
+  'Lentils',
+  'Coconut Milk',
+  'Peanut Butter',
+  'Almonds',
+  'Broccoli',
+  'Hummus',
+];
+
+const POPULAR_DAIRY_EGG: string[] = [
+  'Egg',
+  'Cheese',
+  'Milk',
+  'Butter',
+  'Yogurt',
   'Honey',
 ];
+
+const POPULAR_FISH: string[] = ['Salmon', 'Tuna', 'Shrimp'];
+
+const POPULAR_MEAT: string[] = ['Chicken', 'Beef'];
+
+export function popularIngredients(diet: DietType | null): string[] {
+  switch (diet) {
+    case 'vegan':
+      return [...POPULAR_VEGAN_EXTRAS, ...POPULAR_BASE];
+    case 'vegetarian':
+      return [...POPULAR_DAIRY_EGG, 'Tofu', 'Chickpeas', ...POPULAR_BASE];
+    case 'pescatarian':
+      return [...POPULAR_FISH, ...POPULAR_DAIRY_EGG, ...POPULAR_BASE];
+    default:
+      return [...POPULAR_DAIRY_EGG.slice(0, 5), ...POPULAR_MEAT, ...POPULAR_BASE, 'Honey'];
+  }
+}
+
+// Kept for backward compatibility.
+export const POPULAR_INGREDIENTS: string[] = popularIngredients(null);
 
 export const ALL_INGREDIENTS: string[] = [
   // Proteins & meat
