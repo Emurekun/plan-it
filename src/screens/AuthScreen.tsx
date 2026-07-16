@@ -83,8 +83,12 @@ export default function AuthScreen({ gate = false, onBack }: Props) {
       data: { nickname: sessionNickname.trim() },
     });
     setBusy(false);
-    if (err) setError(err.message);
-    else setMessage('Nickname updated.');
+    if (err) {
+      setError(err.message);
+      return;
+    }
+    // Return to the main screen so the new nickname is visible right away.
+    if (onBack) onBack();
   };
 
   const signOut = async () => {
