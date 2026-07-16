@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 import TodayScreen from '../screens/TodayScreen';
 import PlanScreen from '../screens/PlanScreen';
+import AuthScreen from '../screens/AuthScreen';
 import { isOnboardingComplete } from '../storage/preferences';
 import { colors } from '../theme/theme';
 
@@ -12,6 +13,7 @@ type RootStackParamList = {
   Onboarding: undefined;
   Main: undefined;
   Plan: undefined;
+  Auth: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -49,11 +51,15 @@ export default function RootNavigator() {
             <TodayScreen
               onEditPreferences={() => navigation.replace('Onboarding')}
               onOpenPlan={() => navigation.navigate('Plan')}
+              onOpenAccount={() => navigation.navigate('Auth')}
             />
           )}
         </Stack.Screen>
         <Stack.Screen name="Plan">
           {({ navigation }) => <PlanScreen onBack={() => navigation.goBack()} />}
+        </Stack.Screen>
+        <Stack.Screen name="Auth">
+          {({ navigation }) => <AuthScreen onBack={() => navigation.goBack()} />}
         </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>
