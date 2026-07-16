@@ -2,35 +2,52 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import type { Session } from '@supabase/supabase-js';
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 import TodayScreen from '../screens/TodayScreen';
 import PlanScreen from '../screens/PlanScreen';
 import AuthScreen from '../screens/AuthScreen';
 import { isOnboardingComplete } from '../storage/preferences';
+import { supabase } from '../data/supabaseClient';
 import { colors } from '../theme/theme';
 
 type RootStackParamList = {
+  Auth: undefined;
   Onboarding: undefined;
   Main: undefined;
   Plan: undefined;
-  Auth: undefined;
+  Account: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
-  const [checking, setChecking] = useState(true);
-  const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList>('Onboarding');
+  const [ready, setReady] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+  const [onboarded, setOnboarded] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
     (async () => {
-      const complete = await isOnboardingComplete();
-      setInitialRoute(complete ? 'Main' : 'Onboarding');
-      setChecking(false);
+      const [{ data }, complete] = await Promise.all([
+        supabase.auth.getSession(),
+        isOnboardingComplete(),
+      ]);
+      if (!mounted) return;
+      setSession(data.session ?? null);
+      setOnboarded(complete);
+      setReady(true);
     })();
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+    });
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
-  if (checking) {
+  if (!ready) {
     return (
       <SafeAreaView style={styles.loading}>
         <ActivityIndicator color={colors.primary} size="large" />
@@ -40,27 +57,35 @@ export default function RootNavigator() {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Onboarding">
-          {({ navigation }) => (
-            <OnboardingScreen onComplete={() => navigation.replace('Main')} />
-          )}
-        </Stack.Screen>
-        <Stack.Screen name="Main">
-          {({ navigation }) => (
-            <TodayScreen
-              onEditPreferences={() => navigation.replace('Onboarding')}
-              onOpenPlan={() => navigation.navigate('Plan')}
-              onOpenAccount={() => navigation.navigate('Auth')}
-            />
-          )}
-        </Stack.Screen>
-        <Stack.Screen name="Plan">
-          {({ navigation }) => <PlanScreen onBack={() => navigation.goBack()} />}
-        </Stack.Screen>
-        <Stack.Screen name="Auth">
-          {({ navigation }) => <AuthScreen onBack={() => navigation.goBack()} />}
-        </Stack.Screen>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {!session ? (
+          // Signed out: the app is gated behind sign-in / sign-up.
+          <Stack.Screen name="Auth">
+            {() => <AuthScreen gate />}
+          </Stack.Screen>
+        ) : !onboarded ? (
+          <Stack.Screen name="Onboarding">
+            {() => <OnboardingScreen onComplete={() => setOnboarded(true)} />}
+          </Stack.Screen>
+        ) : (
+          <>
+            <Stack.Screen name="Main">
+              {({ navigation }) => (
+                <TodayScreen
+                  onEditPreferences={() => setOnboarded(false)}
+                  onOpenPlan={() => navigation.navigate('Plan')}
+                  onOpenAccount={() => navigation.navigate('Account')}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="Plan">
+              {({ navigation }) => <PlanScreen onBack={() => navigation.goBack()} />}
+            </Stack.Screen>
+            <Stack.Screen name="Account">
+              {({ navigation }) => <AuthScreen onBack={() => navigation.goBack()} />}
+            </Stack.Screen>
+          </>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );
