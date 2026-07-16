@@ -102,7 +102,7 @@ export default function PlanScreen({ onBack }: Props) {
       </View>
 
       <View style={styles.weekWrap}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weekRow}>
+        <View style={styles.weekRow}>
           {Array.from({ length: 7 }).map((_, i) => {
             const d = addDays(new Date(), i);
             const active = dayOffset === i;
@@ -121,7 +121,7 @@ export default function PlanScreen({ onBack }: Props) {
               </Pressable>
             );
           })}
-        </ScrollView>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -227,15 +227,16 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   weekRow: {
-    gap: spacing.sm,
+    flexDirection: 'row',
+    gap: spacing.xs + 2,
   },
   dayChip: {
+    flex: 1,
     alignItems: 'center',
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: 2,
     borderRadius: radii.md,
     backgroundColor: colors.chipBackground,
-    minWidth: 58,
   },
   dayChipActive: {
     backgroundColor: colors.primary,

@@ -319,7 +319,7 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
             )}
 
             <Text style={styles.fieldLabel}>WHICH DAY?</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayRow}>
+            <View style={styles.dayRow}>
               {Array.from({ length: 7 }).map((_, i) => {
                 const d = addDays(new Date(), i);
                 const active = targetOffset === i;
@@ -335,7 +335,7 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
                   </Pressable>
                 );
               })}
-            </ScrollView>
+            </View>
 
             <Text style={styles.fieldLabel}>HOW MANY GRAMS WILL YOU EAT?</Text>
             <TextInput
@@ -574,6 +574,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   dayRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
   },
   dayChip: {
