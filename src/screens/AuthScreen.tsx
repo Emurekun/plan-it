@@ -14,16 +14,21 @@ import { colors, radii, spacing, typography } from '../theme/theme';
 import { supabase } from '../data/supabaseClient';
 
 type Props = {
-  onBack: () => void;
+  // Gate mode: shown before the app is usable; no back link.
+  gate?: boolean;
+  onBack?: () => void;
 };
 
-export default function AuthScreen({ onBack }: Props) {
+export default function AuthScreen({ gate = false, onBack }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [nickname, setNickname] = useState('');
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
+  const [sessionNickname, setSessionNickname] = useState<string>('');
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
@@ -31,6 +36,7 @@ export default function AuthScreen({ onBack }: Props) {
       try {
         const { data } = await supabase.auth.getSession();
         setSessionEmail(data.session?.user?.email ?? null);
+        setSessionNickname(String(data.session?.user?.user_metadata?.nickname ?? ''));
       } finally {
         setChecking(false);
       }
@@ -41,17 +47,13 @@ export default function AuthScreen({ onBack }: Props) {
     setBusy(true);
     setError(null);
     setMessage(null);
-    const { data, error: err } = await supabase.auth.signInWithPassword({
+    const { error: err } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
     setBusy(false);
-    if (err) {
-      setError(err.message);
-      return;
-    }
-    setSessionEmail(data.session?.user?.email ?? null);
-    setMessage('Signed in! Your day plans now sync to the cloud.');
+    if (err) setError(err.message);
+    // On success the auth listener in RootNavigator switches screens.
   };
 
   const signUp = async () => {
@@ -61,40 +63,54 @@ export default function AuthScreen({ onBack }: Props) {
     const { data, error: err } = await supabase.auth.signUp({
       email: email.trim(),
       password,
+      options: { data: { nickname: nickname.trim() } },
     });
     setBusy(false);
     if (err) {
       setError(err.message);
       return;
     }
-    if (data.session) {
-      setSessionEmail(data.session.user?.email ?? null);
-      setMessage('Account created — you are signed in!');
-    } else {
+    if (!data.session) {
       setMessage('Account created. Please check your email to confirm, then sign in.');
+      setMode('signin');
     }
+  };
+
+  const saveNickname = async () => {
+    setBusy(true);
+    setError(null);
+    const { error: err } = await supabase.auth.updateUser({
+      data: { nickname: sessionNickname.trim() },
+    });
+    setBusy(false);
+    if (err) setError(err.message);
+    else setMessage('Nickname updated.');
   };
 
   const signOut = async () => {
     setBusy(true);
     await supabase.auth.signOut();
     setBusy(false);
-    setSessionEmail(null);
-    setMessage('Signed out. Plans stay saved on this device.');
+    // Auth listener returns the app to the sign-in gate.
   };
+
+  const isSignup = mode === 'signup';
+  const canSubmit = !busy && !!email.trim() && password.length >= 6 && (!isSignup || nickname.trim().length >= 2);
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <View>
-          <Text style={typography.label}>ACCOUNT</Text>
+          <Text style={typography.label}>{gate ? 'WELCOME' : 'ACCOUNT'}</Text>
           <Text style={[typography.title, styles.titleText]}>
-            {sessionEmail ? 'Your account' : 'Sign in'}
+            {sessionEmail && !gate ? 'Your account' : isSignup ? 'Create account' : 'Plan It! Sign in'}
           </Text>
         </View>
-        <Pressable onPress={onBack} hitSlop={12}>
-          <Text style={styles.link}>Back</Text>
-        </Pressable>
+        {onBack && (
+          <Pressable onPress={onBack} hitSlop={12}>
+            <Text style={styles.link}>Back</Text>
+          </Pressable>
+        )}
       </View>
 
       <View style={styles.body}>
@@ -102,20 +118,43 @@ export default function AuthScreen({ onBack }: Props) {
           <View style={styles.centered}>
             <ActivityIndicator color={colors.primary} size="large" />
           </View>
-        ) : sessionEmail ? (
+        ) : sessionEmail && !gate ? (
           <Card style={styles.card}>
-            <Text style={styles.emoji}>✅</Text>
-            <Text style={typography.heading}>{sessionEmail}</Text>
+            <Text style={styles.emoji}>👤</Text>
+            <Text style={[typography.heading, styles.centeredText]}>{sessionEmail}</Text>
             <Text style={[typography.body, styles.hint]}>
-              Your day plans are synced to the cloud and follow you across devices.
+              Your meal plans are synced to the cloud.
             </Text>
+            <Text style={styles.fieldLabel}>Nickname</Text>
+            <TextInput
+              style={styles.input}
+              value={sessionNickname}
+              onChangeText={setSessionNickname}
+              placeholder="Nickname"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+            />
+            <PrimaryButton label="Save nickname" onPress={saveNickname} disabled={busy} style={styles.button} />
             <PrimaryButton label="Sign out" variant="secondary" onPress={signOut} disabled={busy} style={styles.button} />
           </Card>
         ) : (
           <Card style={styles.card}>
             <Text style={[typography.body, styles.hint]}>
-              Create a free account to save your daily meal plans in the cloud.
+              {isSignup
+                ? 'Create your free account to start planning your meals.'
+                : 'Sign in to plan your meals. Your plans sync across devices.'}
             </Text>
+            {isSignup && (
+              <TextInput
+                style={styles.input}
+                value={nickname}
+                onChangeText={setNickname}
+                placeholder="Nickname (shown in the app)"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            )}
             <TextInput
               style={styles.input}
               value={email}
@@ -136,18 +175,24 @@ export default function AuthScreen({ onBack }: Props) {
               autoCapitalize="none"
             />
             <PrimaryButton
-              label={busy ? 'Please wait…' : 'Sign in'}
-              onPress={signIn}
-              disabled={busy || !email.trim() || password.length < 6}
+              label={busy ? 'Please wait…' : isSignup ? 'Create account' : 'Sign in'}
+              onPress={isSignup ? signUp : signIn}
+              disabled={!canSubmit}
               style={styles.button}
             />
-            <PrimaryButton
-              label="Create account"
-              variant="secondary"
-              onPress={signUp}
-              disabled={busy || !email.trim() || password.length < 6}
-              style={styles.button}
-            />
+            <Pressable
+              onPress={() => {
+                setMode(isSignup ? 'signin' : 'signup');
+                setError(null);
+                setMessage(null);
+              }}
+              hitSlop={8}
+              style={styles.switchRow}
+            >
+              <Text style={styles.switchText}>
+                {isSignup ? 'Already have an account? Sign in' : "New here? Create an account"}
+              </Text>
+            </Pressable>
           </Card>
         )}
 
@@ -193,6 +238,9 @@ const styles = StyleSheet.create({
   centered: {
     alignItems: 'center',
   },
+  centeredText: {
+    textAlign: 'center',
+  },
   card: {
     alignItems: 'stretch',
   },
@@ -205,6 +253,13 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     marginBottom: spacing.md,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textMuted,
+    marginBottom: spacing.xs,
+    marginTop: spacing.sm,
   },
   input: {
     backgroundColor: colors.background,
@@ -219,6 +274,15 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: spacing.sm,
+  },
+  switchRow: {
+    marginTop: spacing.md,
+    alignItems: 'center',
+  },
+  switchText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
   },
   feedback: {
     textAlign: 'center',
