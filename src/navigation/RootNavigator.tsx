@@ -7,6 +7,7 @@ import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 import TodayScreen from '../screens/TodayScreen';
 import PlanScreen from '../screens/PlanScreen';
 import AuthScreen from '../screens/AuthScreen';
+import IngredientsScreen from '../screens/IngredientsScreen';
 import { isOnboardingComplete } from '../storage/preferences';
 import { supabase } from '../data/supabaseClient';
 import { colors } from '../theme/theme';
@@ -17,6 +18,7 @@ type RootStackParamList = {
   Main: { dateOffset?: number } | undefined;
   Plan: undefined;
   Account: undefined;
+  Ingredients: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -76,6 +78,7 @@ export default function RootNavigator() {
                   onEditPreferences={() => setOnboarded(false)}
                   onOpenPlan={() => navigation.navigate('Plan')}
                   onOpenAccount={() => navigation.navigate('Account')}
+                  onChangeIngredients={() => navigation.navigate('Ingredients')}
                 />
               )}
             </Stack.Screen>
@@ -89,6 +92,9 @@ export default function RootNavigator() {
             </Stack.Screen>
             <Stack.Screen name="Account">
               {({ navigation }) => <AuthScreen onBack={() => navigation.goBack()} />}
+            </Stack.Screen>
+            <Stack.Screen name="Ingredients">
+              {({ navigation }) => <IngredientsScreen onBack={() => navigation.goBack()} />}
             </Stack.Screen>
           </>
         )}
