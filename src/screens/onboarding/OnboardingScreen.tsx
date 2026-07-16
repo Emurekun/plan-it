@@ -12,7 +12,7 @@ import PrimaryButton from '../../components/PrimaryButton';
 import Chip from '../../components/Chip';
 import { colors, radii, spacing, typography } from '../../theme/theme';
 import { DIET_OPTIONS } from '../../data/options';
-import { POPULAR_INGREDIENTS, searchIngredients } from '../../data/ingredients';
+import { popularIngredients, searchIngredients } from '../../data/ingredients';
 import { DietType, savePreferences } from '../../storage/preferences';
 
 type Props = {
@@ -61,7 +61,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
   ) => {
     const matches = query.trim()
       ? searchIngredients(query)
-      : POPULAR_INGREDIENTS;
+      : popularIngredients(diet);
     const suggestions = matches.filter(
       (name) => !selected.includes(name) && !otherList.includes(name),
     );
