@@ -1,8 +1,14 @@
 {
   "expo": {
     "name": "Plan It!",
-    "slug": "plan-it",
+    "slug": "lets-plan-it",
+    "owner": "chookities-team",
     "version": "1.0.0",
+    "extra": {
+      "eas": {
+        "projectId": "1db9aef0-1f5b-4736-ae58-13a37c64c129"
+      }
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
