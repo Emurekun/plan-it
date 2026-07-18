@@ -173,6 +173,7 @@ const S: Record<string, { en: string; tr: string }> = {
     tr: 'Hesabını ve tüm planlarını siler. Geri alınamaz.',
   },
   deleteFail: { en: 'Could not delete account.', tr: 'Hesap silinemedi.' },
+  attribution: { en: 'Recipe data & images: TheMealDB', tr: 'Tarif verisi ve görseller: TheMealDB' },
 };
 
 export function t(key: string): string {
