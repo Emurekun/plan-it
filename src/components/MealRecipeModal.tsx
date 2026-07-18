@@ -1,7 +1,17 @@
-import React from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { colors, radii, spacing, typography } from '../theme/theme';
 import { SpoonMeal } from '../data/spoonacular';
+import { t, useLang, translateRecipeTr } from '../data/i18n';
 import PrimaryButton from './PrimaryButton';
 
 type Props = {
@@ -10,20 +20,54 @@ type Props = {
   onClose: () => void;
 };
 
-const MACROS: { key: 'protein' | 'carbs' | 'sugar' | 'fat' | 'fiber'; label: string; color: string }[] = [
-  { key: 'protein', label: 'Protein', color: '#2F7A54' },
-  { key: 'carbs', label: 'Carbs', color: '#C08A2D' },
-  { key: 'sugar', label: 'Sugar', color: '#C24E7A' },
-  { key: 'fat', label: 'Fat', color: '#C24E4E' },
-  { key: 'fiber', label: 'Fiber', color: '#6B8E23' },
+const MACROS: { key: 'protein' | 'carbs' | 'sugar' | 'fat' | 'fiber'; labelKey: string; color: string }[] = [
+  { key: 'protein', labelKey: 'protein', color: '#2F7A54' },
+  { key: 'carbs', labelKey: 'carbs', color: '#C08A2D' },
+  { key: 'sugar', labelKey: 'sugar', color: '#C24E7A' },
+  { key: 'fat', labelKey: 'fat', color: '#C24E4E' },
+  { key: 'fiber', labelKey: 'fiber', color: '#6B8E23' },
 ];
 
+const MACRO_TR: Record<string, string> = { sugar: 'Şeker' };
+const MACRO_EN: Record<string, string> = { sugar: 'Sugar' };
+
 export default function MealRecipeModal({ visible, meal, onClose }: Props) {
+  const lang = useLang();
+  const [trContent, setTrContent] = useState<{ ingredients: string[]; steps: string[] } | null>(null);
+  const [translating, setTranslating] = useState(false);
+
+  useEffect(() => {
+    setTrContent(null);
+    if (!visible || !meal || lang !== 'tr') return;
+    let active = true;
+    setTranslating(true);
+    translateRecipeTr(meal.id, meal.ingredients, meal.steps)
+      .then((v) => {
+        if (active) setTrContent(v);
+      })
+      .finally(() => {
+        if (active) setTranslating(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [visible, meal?.id, lang]);
+
   if (!meal) return null;
+
+  const title = lang === 'tr' && meal.titleTr ? meal.titleTr : meal.title;
+  const ingredients = lang === 'tr' && trContent ? trContent.ingredients : meal.ingredients;
+  const steps = lang === 'tr' && trContent ? trContent.steps : meal.steps;
+
+  const macroLabel = (key: string, labelKey: string) => {
+    if (key === 'sugar') return lang === 'tr' ? MACRO_TR.sugar : MACRO_EN.sugar;
+    return t(labelKey);
+  };
+
   const subtitleParts: string[] = [];
   if (meal.dishTypes[0]) subtitleParts.push(meal.dishTypes[0]);
-  if (meal.readyInMinutes) subtitleParts.push(`${meal.readyInMinutes} min`);
-  if (meal.servings) subtitleParts.push(`${meal.servings} servings`);
+  if (meal.readyInMinutes) subtitleParts.push(`${meal.readyInMinutes} ${t('min')}`);
+  if (meal.servings) subtitleParts.push(`${meal.servings} ${t('servings')}`);
   const subtitle = subtitleParts.join(' · ');
   const n = meal.nutrition;
 
@@ -39,7 +83,7 @@ export default function MealRecipeModal({ visible, meal, onClose }: Props) {
                 <Image source={{ uri: meal.image }} style={styles.photo} resizeMode="cover" />
               </View>
             ) : null}
-            <Text style={[typography.heading, styles.centered]}>{meal.title}</Text>
+            <Text style={[typography.heading, styles.centered]}>{title}</Text>
             {subtitle ? (
               <Text style={[typography.subtitle, styles.centered, styles.descriptionSpacing]}>
                 {subtitle}
@@ -50,13 +94,13 @@ export default function MealRecipeModal({ visible, meal, onClose }: Props) {
               <View style={styles.nutritionCard}>
                 <View style={styles.calorieBlock}>
                   <Text style={styles.calorieValue}>{n.calories ?? '—'}</Text>
-                  <Text style={styles.calorieUnit}>kcal per 100 g</Text>
+                  <Text style={styles.calorieUnit}>{t('kcalPer100')}</Text>
                 </View>
                 <View style={styles.macroRow}>
                   {MACROS.map((m) => (
                     <View key={m.key} style={styles.macroItem}>
                       <View style={[styles.macroDot, { backgroundColor: m.color }]} />
-                      <Text style={styles.macroLabel}>{m.label}</Text>
+                      <Text style={styles.macroLabel}>{macroLabel(m.key, m.labelKey)}</Text>
                       <Text style={styles.macroValue}>{n[m.key] === null ? '—' : `${n[m.key]} g`}</Text>
                     </View>
                   ))}
@@ -64,10 +108,17 @@ export default function MealRecipeModal({ visible, meal, onClose }: Props) {
               </View>
             )}
 
-            {meal.ingredients.length > 0 && (
+            {lang === 'tr' && translating && (
+              <View style={styles.translatingRow}>
+                <ActivityIndicator color={colors.primary} size="small" />
+                <Text style={styles.translatingText}>{t('translating')}</Text>
+              </View>
+            )}
+
+            {ingredients.length > 0 && (
               <>
-                <Text style={[typography.label, styles.sectionLabel]}>INGREDIENTS</Text>
-                {meal.ingredients.map((item, i) => (
+                <Text style={[typography.label, styles.sectionLabel]}>{t('ingredientsHdr')}</Text>
+                {ingredients.map((item, i) => (
                   <View key={i} style={styles.ingredientRow}>
                     <Text style={styles.bullet}>•</Text>
                     <Text style={[typography.body, styles.listText]}>{item}</Text>
@@ -76,10 +127,10 @@ export default function MealRecipeModal({ visible, meal, onClose }: Props) {
               </>
             )}
 
-            {meal.steps.length > 0 && (
+            {steps.length > 0 && (
               <>
-                <Text style={[typography.label, styles.sectionLabel]}>STEPS</Text>
-                {meal.steps.map((step, i) => (
+                <Text style={[typography.label, styles.sectionLabel]}>{t('stepsHdr')}</Text>
+                {steps.map((step, i) => (
                   <View key={i} style={styles.stepRow}>
                     <View style={styles.stepNumber}>
                       <Text style={styles.stepNumberText}>{i + 1}</Text>
@@ -90,7 +141,7 @@ export default function MealRecipeModal({ visible, meal, onClose }: Props) {
               </>
             )}
           </ScrollView>
-          <PrimaryButton label="Close" variant="secondary" onPress={onClose} style={styles.closeButton} />
+          <PrimaryButton label={t('close')} variant="secondary" onPress={onClose} style={styles.closeButton} />
         </View>
       </View>
     </Modal>
@@ -199,6 +250,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: colors.text,
+  },
+  translatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.md,
+  },
+  translatingText: {
+    marginLeft: spacing.sm,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textMuted,
   },
   sectionLabel: {
     marginTop: spacing.lg,
