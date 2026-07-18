@@ -166,6 +166,13 @@ const S: Record<string, { en: string; tr: string }> = {
   mealsPlannedOf3: { en: 'of 3 meals planned', tr: '/ 3 öğün planlandı' },
   min: { en: 'min', tr: 'dk' },
   servings: { en: 'servings', tr: 'porsiyon' },
+  deleteAccount: { en: 'Delete account', tr: 'Hesabı sil' },
+  confirmDelete: { en: 'Tap again to permanently delete', tr: 'Kalıcı silmek için tekrar dokun' },
+  deleteWarn: {
+    en: 'Deletes your account and all plans. This cannot be undone.',
+    tr: 'Hesabını ve tüm planlarını siler. Geri alınamaz.',
+  },
+  deleteFail: { en: 'Could not delete account.', tr: 'Hesap silinemedi.' },
 };
 
 export function t(key: string): string {
