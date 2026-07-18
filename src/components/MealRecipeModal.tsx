@@ -146,6 +146,8 @@ export default function MealRecipeModal({ visible, meal, onClose }: Props) {
                 ))}
               </>
             )}
+
+            <Text style={styles.attribution}>{t('attribution')}</Text>
           </ScrollView>
           <PrimaryButton label={t('close')} variant="secondary" onPress={onClose} style={styles.closeButton} />
         </View>
@@ -305,6 +307,12 @@ const styles = StyleSheet.create({
   listText: {
     flex: 1,
     lineHeight: 22,
+  },
+  attribution: {
+    fontSize: 11,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: spacing.lg,
   },
   closeButton: {
     marginHorizontal: spacing.lg,
