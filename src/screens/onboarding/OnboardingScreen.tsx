@@ -14,6 +14,7 @@ import { colors, radii, spacing, typography } from '../../theme/theme';
 import { DIET_OPTIONS } from '../../data/options';
 import { popularIngredients, searchIngredients } from '../../data/ingredients';
 import { DietType, savePreferences } from '../../storage/preferences';
+import { t, useLang } from '../../data/i18n';
 
 type Props = {
   onComplete: () => void;
@@ -21,7 +22,15 @@ type Props = {
 
 const STEP_COUNT = 4;
 
+const DIET_TR: Record<string, string> = {
+  none: 'Kısıtlama yok',
+  vegetarian: 'Vejetaryen',
+  vegan: 'Vegan',
+  pescatarian: 'Pesketaryen',
+};
+
 export default function OnboardingScreen({ onComplete }: Props) {
+  const lang = useLang();
   const [step, setStep] = useState(0);
   const [diet, setDiet] = useState<DietType | null>(null);
   const [have, setHave] = useState<string[]>([]);
@@ -91,7 +100,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
         )}
 
         <Text style={[typography.label, styles.pickerLabel]}>
-          {query.trim() ? 'RESULTS' : 'POPULAR'}
+          {query.trim() ? t('results') : t('popular')}
         </Text>
         <View style={styles.optionList}>
           {suggestions.map((name) => (
@@ -103,9 +112,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
             />
           ))}
           {query.trim() && suggestions.length === 0 && (
-            <Text style={[typography.subtitle, styles.noMatch]}>
-              No match. You can pick from Popular or try another spelling.
-            </Text>
+            <Text style={[typography.subtitle, styles.noMatch]}>{t('noIngMatch')}</Text>
           )}
         </View>
       </View>
@@ -124,24 +131,20 @@ export default function OnboardingScreen({ onComplete }: Props) {
         {step === 0 && (
           <View>
             <Text style={styles.emoji}>🧑‍🍳</Text>
-            <Text style={typography.title}>Welcome to Plan It!</Text>
-            <Text style={[typography.subtitle, styles.spacedTop]}>
-              Tell us what's in your kitchen and we'll suggest meals for breakfast, lunch, and
-              dinner that you can actually make. It only takes a minute, and everything stays on
-              your device.
-            </Text>
+            <Text style={typography.title}>{t('welcomeTitle')}</Text>
+            <Text style={[typography.subtitle, styles.spacedTop]}>{t('welcomeText')}</Text>
           </View>
         )}
 
         {step === 1 && (
           <View>
-            <Text style={typography.label}>STEP 1 OF 3</Text>
-            <Text style={[typography.heading, styles.spacedTop]}>Do you follow a diet type?</Text>
+            <Text style={typography.label}>{t('step1')}</Text>
+            <Text style={[typography.heading, styles.spacedTop]}>{t('dietQ')}</Text>
             <View style={[styles.optionList, styles.spacedTop]}>
               {DIET_OPTIONS.map((opt) => (
                 <Chip
                   key={opt.value}
-                  label={opt.label}
+                  label={lang === 'tr' ? DIET_TR[opt.value] ?? opt.label : opt.label}
                   selected={diet === opt.value}
                   onPress={() => setDiet(opt.value)}
                 />
@@ -152,54 +155,36 @@ export default function OnboardingScreen({ onComplete }: Props) {
 
         {step === 2 && (
           <View>
-            <Text style={typography.label}>STEP 2 OF 3</Text>
-            <Text style={[typography.heading, styles.spacedTop]}>Ingredients you have</Text>
-            <Text style={[typography.subtitle, styles.spacedTopSm]}>
-              Search and add what's in your kitchen. We'll suggest recipes that use them.
-            </Text>
-            {renderPicker(
-              have,
-              setHave,
-              haveQuery,
-              setHaveQuery,
-              avoid,
-              'Search ingredients (e.g. eggs, cheese)',
-            )}
+            <Text style={typography.label}>{t('step2')}</Text>
+            <Text style={[typography.heading, styles.spacedTop]}>{t('ingHaveTitle')}</Text>
+            <Text style={[typography.subtitle, styles.spacedTopSm]}>{t('ingHaveHint')}</Text>
+            {renderPicker(have, setHave, haveQuery, setHaveQuery, avoid, t('searchIngPh'))}
           </View>
         )}
 
         {step === 3 && (
           <View>
-            <Text style={typography.label}>STEP 3 OF 3</Text>
-            <Text style={[typography.heading, styles.spacedTop]}>Ingredients to avoid</Text>
-            <Text style={[typography.subtitle, styles.spacedTopSm]}>
-              We'll skip recipes that contain these.
-            </Text>
-            {renderPicker(
-              avoid,
-              setAvoid,
-              avoidQuery,
-              setAvoidQuery,
-              have,
-              'Search ingredients to avoid',
-            )}
+            <Text style={typography.label}>{t('step3')}</Text>
+            <Text style={[typography.heading, styles.spacedTop]}>{t('ingAvoidTitle')}</Text>
+            <Text style={[typography.subtitle, styles.spacedTopSm]}>{t('ingAvoidHint')}</Text>
+            {renderPicker(avoid, setAvoid, avoidQuery, setAvoidQuery, have, t('searchAvoidPh'))}
           </View>
         )}
       </ScrollView>
 
       <View style={styles.footer}>
         {step > 0 && (
-          <PrimaryButton label="Back" variant="secondary" onPress={goBack} style={styles.backButton} />
+          <PrimaryButton label={t('back')} variant="secondary" onPress={goBack} style={styles.backButton} />
         )}
         {step < STEP_COUNT - 1 ? (
           <PrimaryButton
-            label={step === 0 ? "Let's go" : 'Next'}
+            label={step === 0 ? t('letsGo') : t('next')}
             onPress={goNext}
             disabled={step === 1 && !diet}
             style={styles.nextButton}
           />
         ) : (
-          <PrimaryButton label="Start planning" onPress={finish} disabled={saving} style={styles.nextButton} />
+          <PrimaryButton label={t('startPlanning')} onPress={finish} disabled={saving} style={styles.nextButton} />
         )}
       </View>
     </SafeAreaView>
