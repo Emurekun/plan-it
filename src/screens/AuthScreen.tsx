@@ -32,6 +32,7 @@ export default function AuthScreen({ gate = false, onBack }: Props) {
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [sessionNickname, setSessionNickname] = useState<string>('');
   const [checking, setChecking] = useState(true);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -100,6 +101,26 @@ export default function AuthScreen({ gate = false, onBack }: Props) {
     // Auth listener returns the app to the sign-in gate.
   };
 
+  const deleteAccount = async () => {
+    // Two-step confirmation: first tap arms the button, second tap deletes.
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const { error: err } = await supabase.rpc('delete_user');
+    if (err) {
+      setBusy(false);
+      setConfirmingDelete(false);
+      setError(t('deleteFail'));
+      return;
+    }
+    await supabase.auth.signOut();
+    setBusy(false);
+    // Auth listener returns the app to the sign-in gate.
+  };
+
   const isSignup = mode === 'signup';
   const canSubmit = !busy && !!email.trim() && password.length >= 6 && (!isSignup || nickname.trim().length >= 2);
 
@@ -151,6 +172,12 @@ export default function AuthScreen({ gate = false, onBack }: Props) {
             />
             <PrimaryButton label={t('saveNickname')} onPress={saveNickname} disabled={busy} style={styles.button} />
             <PrimaryButton label={t('signOut')} variant="secondary" onPress={signOut} disabled={busy} style={styles.button} />
+            <Pressable onPress={deleteAccount} disabled={busy} hitSlop={8} style={styles.deleteRow}>
+              <Text style={styles.deleteText}>
+                {confirmingDelete ? t('confirmDelete') : t('deleteAccount')}
+              </Text>
+            </Pressable>
+            {confirmingDelete && <Text style={styles.deleteWarn}>{t('deleteWarn')}</Text>}
           </Card>
         ) : (
           <Card style={styles.card}>
@@ -320,6 +347,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.primary,
+  },
+  deleteRow: {
+    marginTop: spacing.lg,
+    alignItems: 'center',
+  },
+  deleteText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.danger,
+  },
+  deleteWarn: {
+    fontSize: 12,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: spacing.xs,
   },
   feedback: {
     textAlign: 'center',
