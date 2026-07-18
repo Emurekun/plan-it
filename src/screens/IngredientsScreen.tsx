@@ -14,6 +14,7 @@ import PrimaryButton from '../components/PrimaryButton';
 import { colors, radii, spacing, typography } from '../theme/theme';
 import { popularIngredients, searchIngredients } from '../data/ingredients';
 import { loadPreferences, savePreferences, Preferences } from '../storage/preferences';
+import { t, useLang } from '../data/i18n';
 
 type Props = {
   onBack: () => void;
@@ -23,6 +24,7 @@ type Props = {
 // changes day to day) without redoing the whole onboarding. Diet and avoided
 // ingredients stay as they are.
 export default function IngredientsScreen({ onBack }: Props) {
+  useLang();
   const [prefs, setPrefs] = useState<Preferences | null>(null);
   const [have, setHave] = useState<string[]>([]);
   const [query, setQuery] = useState('');
@@ -66,11 +68,11 @@ export default function IngredientsScreen({ onBack }: Props) {
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <View>
-          <Text style={typography.label}>YOUR KITCHEN</Text>
-          <Text style={[typography.title, styles.titleText]}>Ingredients you have</Text>
+          <Text style={typography.label}>{t('yourKitchen')}</Text>
+          <Text style={[typography.title, styles.titleText]}>{t('ingHaveTitle')}</Text>
         </View>
         <Pressable onPress={onBack} hitSlop={12}>
-          <Text style={styles.link}>Cancel</Text>
+          <Text style={styles.link}>{t('cancel')}</Text>
         </Pressable>
       </View>
 
@@ -79,15 +81,13 @@ export default function IngredientsScreen({ onBack }: Props) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[typography.subtitle, styles.hint]}>
-          Update what's in your kitchen — suggestions will match the new list.
-        </Text>
+        <Text style={[typography.subtitle, styles.hint]}>{t('kitchenHint')}</Text>
 
         <TextInput
           style={styles.search}
           value={query}
           onChangeText={setQuery}
-          placeholder="Search ingredients (e.g. eggs, cheese)"
+          placeholder={t('searchIngPh')}
           placeholderTextColor={colors.textMuted}
           autoCorrect={false}
         />
@@ -101,23 +101,21 @@ export default function IngredientsScreen({ onBack }: Props) {
         )}
 
         <Text style={[typography.label, styles.pickerLabel]}>
-          {query.trim() ? 'RESULTS' : 'POPULAR'}
+          {query.trim() ? t('results') : t('popular')}
         </Text>
         <View style={styles.optionList}>
           {suggestions.map((name) => (
             <Chip key={name} label={name} selected={false} onPress={() => toggle(name)} />
           ))}
           {query.trim() && suggestions.length === 0 && (
-            <Text style={[typography.subtitle, styles.noMatch]}>
-              No match. Try another spelling or pick from Popular.
-            </Text>
+            <Text style={[typography.subtitle, styles.noMatch]}>{t('noIngMatch')}</Text>
           )}
         </View>
       </ScrollView>
 
       <View style={styles.footer}>
         <PrimaryButton
-          label={saving ? 'Saving…' : 'Save ingredients'}
+          label={saving ? t('saving') : t('saveIngredients')}
           onPress={save}
           disabled={saving}
           style={styles.saveButton}

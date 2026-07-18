@@ -20,6 +20,7 @@ import { MealType, SpoonMeal, suggestMeals } from '../data/spoonacular';
 import { loadPreferences, resetOnboarding, Preferences } from '../storage/preferences';
 import { setPlannedMeal, isoDate, addDays } from '../storage/dayPlan';
 import { supabase } from '../data/supabaseClient';
+import { t, useLang, setLang, locale } from '../data/i18n';
 
 type Props = {
   onEditPreferences: () => void;
@@ -31,11 +32,7 @@ type Props = {
   dateOffset?: number;
 };
 
-const MEAL_TYPES: { key: MealType; label: string }[] = [
-  { key: 'breakfast', label: 'Breakfast' },
-  { key: 'lunch', label: 'Lunch' },
-  { key: 'dinner', label: 'Dinner' },
-];
+const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner'];
 
 const PAGE = 8;
 
@@ -50,7 +47,7 @@ type Bucket = {
 const emptyBucket: Bucket = { meals: [], index: 0, offset: 0, loading: false, error: null };
 
 function dateTitle(d: Date): string {
-  return d.toLocaleDateString('en-US', {
+  return d.toLocaleDateString(locale(), {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
@@ -62,12 +59,13 @@ function fmt(v: number | null): string {
 }
 
 function dayChipLabel(offset: number, date: Date): string {
-  if (offset === 0) return 'Today';
-  if (offset === 1) return 'Tomorrow';
-  return date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
+  if (offset === 0) return t('todayChip');
+  if (offset === 1) return t('tomorrowChip');
+  return date.toLocaleDateString(locale(), { weekday: 'short', day: 'numeric' });
 }
 
 export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccount, onChangeIngredients, dateOffset = 0 }: Props) {
+  const lang = useLang();
   const [preferences, setPreferences] = useState<Preferences | null>(null);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [mealType, setMealType] = useState<MealType>('breakfast');
@@ -110,7 +108,7 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
               index: merged.length ? Math.min(nextIndex, merged.length - 1) : 0,
               offset,
               loading: false,
-              error: merged.length ? null : 'No recipes matched. Try adjusting your ingredients.',
+              error: merged.length ? null : 'noMatch',
             },
           };
         });
@@ -118,7 +116,7 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
         if (reqRef.current[type] !== id) return;
         setBuckets((prev) => ({
           ...prev,
-          [type]: { ...prev[type], loading: false, error: e?.message ?? 'Could not load suggestions.' },
+          [type]: { ...prev[type], loading: false, error: e?.message ?? 'loadFail' },
         }));
       }
     },
@@ -235,24 +233,33 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <View>
-          <Text style={typography.label}>{dateOffset === 0 ? 'TODAY' : 'PLANNING'}</Text>
+          <Text style={typography.label}>{dateOffset === 0 ? t('today') : t('planning')}</Text>
           <Text style={[typography.title, styles.dateText]}>
             {dateTitle(addDays(new Date(), dateOffset))}
           </Text>
         </View>
         <View style={styles.headerLinks}>
+          <View style={styles.langRow}>
+            <Pressable onPress={() => setLang('en')} hitSlop={6}>
+              <Text style={[styles.langBtn, lang === 'en' && styles.langBtnActive]}>EN</Text>
+            </Pressable>
+            <Text style={styles.langSep}>|</Text>
+            <Pressable onPress={() => setLang('tr')} hitSlop={6}>
+              <Text style={[styles.langBtn, lang === 'tr' && styles.langBtnActive]}>TR</Text>
+            </Pressable>
+          </View>
           {nickname && <Text style={styles.nickname}>👤 {nickname}</Text>}
           <Pressable onPress={onOpenPlan} hitSlop={8}>
-            <Text style={styles.link}>My plan →</Text>
+            <Text style={styles.link}>{t('myPlan')}</Text>
           </Pressable>
           <Pressable onPress={onChangeIngredients} hitSlop={8}>
-            <Text style={styles.editLink}>Change ingredients</Text>
+            <Text style={styles.editLink}>{t('changeIngredients')}</Text>
           </Pressable>
           <Pressable onPress={handleEditPreferences} hitSlop={8}>
-            <Text style={styles.editLink}>Edit preferences</Text>
+            <Text style={styles.editLink}>{t('editPrefs')}</Text>
           </Pressable>
           <Pressable onPress={onOpenAccount} hitSlop={8}>
-            <Text style={styles.editLink}>Account</Text>
+            <Text style={styles.editLink}>{t('account')}</Text>
           </Pressable>
         </View>
       </View>
@@ -260,31 +267,35 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
       <View style={styles.body}>
         <View style={styles.selectorRow}>
           {MEAL_TYPES.map((mt) => {
-            const active = mealType === mt.key;
+            const active = mealType === mt;
             return (
               <Pressable
-                key={mt.key}
-                onPress={() => selectMeal(mt.key)}
+                key={mt}
+                onPress={() => selectMeal(mt)}
                 style={[styles.segment, active && styles.segmentActive]}
               >
-                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{mt.label}</Text>
+                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{t(mt)}</Text>
               </Pressable>
             );
           })}
         </View>
 
-        <Text style={[typography.label, styles.suggestionLabel]}>{mealType.toUpperCase()} SUGGESTION</Text>
+        <Text style={[typography.label, styles.suggestionLabel]}>
+          {t(mealType).toUpperCase()} {t('suggestionSuffix')}
+        </Text>
 
         <Card style={styles.card}>
           {bucket.loading ? (
             <View style={styles.state}>
               <ActivityIndicator color={colors.primary} size="large" />
-              <Text style={[typography.body, styles.stateText]}>Finding a recipe…</Text>
+              <Text style={[typography.body, styles.stateText]}>{t('findingRecipe')}</Text>
             </View>
           ) : bucket.error ? (
             <View style={styles.state}>
               <Text style={styles.emoji}>😕</Text>
-              <Text style={[typography.body, styles.stateText]}>{bucket.error}</Text>
+              <Text style={[typography.body, styles.stateText]}>
+                {bucket.error === 'noMatch' || bucket.error === 'loadFail' ? t(bucket.error) : bucket.error}
+              </Text>
             </View>
           ) : meal ? (
             <View style={styles.mealWrap}>
@@ -295,13 +306,15 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
                 <View style={styles.photoShadow}>
                   <Image source={{ uri: meal.image }} style={styles.photo} resizeMode="cover" />
                 </View>
-                <Text style={typography.heading}>{meal.title}</Text>
+                <Text style={typography.heading}>
+                  {lang === 'tr' && meal.titleTr ? meal.titleTr : meal.title}
+                </Text>
                 {subtitle ? <Text style={[typography.body, styles.description]}>{subtitle}</Text> : null}
                 {n && n.calories !== null && (
                   <View style={styles.nutriRow}>
                     <Text style={styles.kcal}>{n.calories} kcal / 100g</Text>
                     <Text style={styles.macros}>
-                      P {fmt(n.protein)} · C {fmt(n.carbs)} · F {fmt(n.fat)} (per 100g)
+                      P {fmt(n.protein)} · C {fmt(n.carbs)} · F {fmt(n.fat)} {t('per100g')}
                     </Text>
                   </View>
                 )}
@@ -309,27 +322,27 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
 
               <View style={styles.pillRow}>
                 <Pressable onPress={() => setRecipeVisible(true)} style={styles.recipeHint}>
-                  <Text style={styles.recipeHintText}>Tap for recipe 📖</Text>
+                  <Text style={styles.recipeHintText}>{t('tapForRecipe')}</Text>
                 </Pressable>
                 <Pressable
                   onPress={openAddModal}
                   style={[styles.recipeHint, added && styles.recipeHintDone]}
                 >
                   <Text style={[styles.recipeHintText, added && styles.recipeHintDoneText]}>
-                    {added ? 'Added to plan ✓' : 'Add to plan ➕'}
+                    {added ? t('addedToPlan') : t('addToPlan')}
                   </Text>
                 </Pressable>
               </View>
             </View>
           ) : (
             <View style={styles.state}>
-              <Text style={[typography.body, styles.stateText]}>No suggestion yet.</Text>
+              <Text style={[typography.body, styles.stateText]}>{t('noSuggestion')}</Text>
             </View>
           )}
         </Card>
 
         <PrimaryButton
-          label="Give me another"
+          label={t('giveAnother')}
           onPress={handleAnother}
           disabled={bucket.loading}
           style={styles.anotherButton}
@@ -342,14 +355,16 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
         <View style={styles.backdrop}>
           <Pressable style={styles.backdropTouchable} onPress={() => setAddVisible(false)} />
           <View style={styles.sheet}>
-            <Text style={[typography.heading, styles.sheetTitle]}>Add to plan</Text>
+            <Text style={[typography.heading, styles.sheetTitle]}>
+              {t('addToPlan').replace(' ➕', '')}
+            </Text>
             {meal && (
               <Text style={[typography.body, styles.sheetMeal]} numberOfLines={1}>
-                {meal.title}
+                {lang === 'tr' && meal.titleTr ? meal.titleTr : meal.title}
               </Text>
             )}
 
-            <Text style={styles.fieldLabel}>WHICH DAY?</Text>
+            <Text style={styles.fieldLabel}>{t('whichDay')}</Text>
             <View style={styles.dayRow}>
               {Array.from({ length: 7 }).map((_, i) => {
                 const d = addDays(new Date(), i);
@@ -368,7 +383,7 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
               })}
             </View>
 
-            <Text style={styles.fieldLabel}>HOW MANY GRAMS WILL YOU EAT?</Text>
+            <Text style={styles.fieldLabel}>{t('howManyGrams')}</Text>
             <TextInput
               style={styles.gramsInput}
               value={gramsText}
@@ -382,12 +397,12 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
             )}
 
             <PrimaryButton
-              label={saving ? 'Saving…' : 'Save to plan'}
+              label={saving ? t('saving') : t('saveToPlan')}
               onPress={confirmAdd}
               disabled={saving || !(isFinite(gramsNum) && gramsNum > 0)}
               style={styles.saveButton}
             />
-            <PrimaryButton label="Cancel" variant="secondary" onPress={() => setAddVisible(false)} style={styles.saveButton} />
+            <PrimaryButton label={t('cancel')} variant="secondary" onPress={() => setAddVisible(false)} style={styles.saveButton} />
           </View>
         </View>
       </Modal>
@@ -417,6 +432,24 @@ const styles = StyleSheet.create({
   },
   headerLinks: {
     alignItems: 'flex-end',
+  },
+  langRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  langBtn: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textMuted,
+    paddingHorizontal: 4,
+  },
+  langBtnActive: {
+    color: colors.primary,
+  },
+  langSep: {
+    color: colors.border,
+    fontSize: 13,
   },
   nickname: {
     fontSize: 14,

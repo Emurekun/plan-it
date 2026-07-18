@@ -12,6 +12,7 @@ import Card from '../components/Card';
 import PrimaryButton from '../components/PrimaryButton';
 import { colors, radii, spacing, typography } from '../theme/theme';
 import { supabase } from '../data/supabaseClient';
+import { t, useLang, setLang } from '../data/i18n';
 
 type Props = {
   // Gate mode: shown before the app is usable; no back link.
@@ -20,6 +21,7 @@ type Props = {
 };
 
 export default function AuthScreen({ gate = false, onBack }: Props) {
+  const lang = useLang();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [nickname, setNickname] = useState('');
@@ -71,7 +73,7 @@ export default function AuthScreen({ gate = false, onBack }: Props) {
       return;
     }
     if (!data.session) {
-      setMessage('Account created. Please check your email to confirm, then sign in.');
+      setMessage('confirmEmail');
       setMode('signin');
     }
   };
@@ -105,16 +107,27 @@ export default function AuthScreen({ gate = false, onBack }: Props) {
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <View>
-          <Text style={typography.label}>{gate ? 'WELCOME' : 'ACCOUNT'}</Text>
+          <Text style={typography.label}>{gate ? t('welcomeHdr') : t('accountHdr')}</Text>
           <Text style={[typography.title, styles.titleText]}>
-            {sessionEmail && !gate ? 'Your account' : isSignup ? 'Create account' : 'Plan It! Sign in'}
+            {sessionEmail && !gate ? t('yourAccount') : isSignup ? t('createAccountTitle') : t('signInTitle')}
           </Text>
         </View>
-        {onBack && (
-          <Pressable onPress={onBack} hitSlop={12}>
-            <Text style={styles.link}>Back</Text>
-          </Pressable>
-        )}
+        <View style={styles.headerRight}>
+          <View style={styles.langRow}>
+            <Pressable onPress={() => setLang('en')} hitSlop={8}>
+              <Text style={[styles.langBtn, lang === 'en' && styles.langBtnActive]}>EN</Text>
+            </Pressable>
+            <Text style={styles.langSep}>|</Text>
+            <Pressable onPress={() => setLang('tr')} hitSlop={8}>
+              <Text style={[styles.langBtn, lang === 'tr' && styles.langBtnActive]}>TR</Text>
+            </Pressable>
+          </View>
+          {onBack && (
+            <Pressable onPress={onBack} hitSlop={12}>
+              <Text style={styles.link}>{t('back')}</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
 
       <View style={styles.body}>
@@ -126,34 +139,30 @@ export default function AuthScreen({ gate = false, onBack }: Props) {
           <Card style={styles.card}>
             <Text style={styles.emoji}>👤</Text>
             <Text style={[typography.heading, styles.centeredText]}>{sessionEmail}</Text>
-            <Text style={[typography.body, styles.hint]}>
-              Your meal plans are synced to the cloud.
-            </Text>
-            <Text style={styles.fieldLabel}>Nickname</Text>
+            <Text style={[typography.body, styles.hint]}>{t('cloudHint')}</Text>
+            <Text style={styles.fieldLabel}>{t('nickname')}</Text>
             <TextInput
               style={styles.input}
               value={sessionNickname}
               onChangeText={setSessionNickname}
-              placeholder="Nickname"
+              placeholder={t('nickname')}
               placeholderTextColor={colors.textMuted}
               autoCapitalize="none"
             />
-            <PrimaryButton label="Save nickname" onPress={saveNickname} disabled={busy} style={styles.button} />
-            <PrimaryButton label="Sign out" variant="secondary" onPress={signOut} disabled={busy} style={styles.button} />
+            <PrimaryButton label={t('saveNickname')} onPress={saveNickname} disabled={busy} style={styles.button} />
+            <PrimaryButton label={t('signOut')} variant="secondary" onPress={signOut} disabled={busy} style={styles.button} />
           </Card>
         ) : (
           <Card style={styles.card}>
             <Text style={[typography.body, styles.hint]}>
-              {isSignup
-                ? 'Create your free account to start planning your meals.'
-                : 'Sign in to plan your meals. Your plans sync across devices.'}
+              {isSignup ? t('signUpHint') : t('signInHint')}
             </Text>
             {isSignup && (
               <TextInput
                 style={styles.input}
                 value={nickname}
                 onChangeText={setNickname}
-                placeholder="Nickname (shown in the app)"
+                placeholder={t('nicknamePh')}
                 placeholderTextColor={colors.textMuted}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -163,7 +172,7 @@ export default function AuthScreen({ gate = false, onBack }: Props) {
               style={styles.input}
               value={email}
               onChangeText={setEmail}
-              placeholder="Email"
+              placeholder={t('email')}
               placeholderTextColor={colors.textMuted}
               autoCapitalize="none"
               autoCorrect={false}
@@ -173,13 +182,13 @@ export default function AuthScreen({ gate = false, onBack }: Props) {
               style={styles.input}
               value={password}
               onChangeText={setPassword}
-              placeholder="Password (min 6 characters)"
+              placeholder={t('passwordPh')}
               placeholderTextColor={colors.textMuted}
               secureTextEntry
               autoCapitalize="none"
             />
             <PrimaryButton
-              label={busy ? 'Please wait…' : isSignup ? 'Create account' : 'Sign in'}
+              label={busy ? t('pleaseWait') : isSignup ? t('createAccount') : t('signIn')}
               onPress={isSignup ? signUp : signIn}
               disabled={!canSubmit}
               style={styles.button}
@@ -194,13 +203,17 @@ export default function AuthScreen({ gate = false, onBack }: Props) {
               style={styles.switchRow}
             >
               <Text style={styles.switchText}>
-                {isSignup ? 'Already have an account? Sign in' : "New here? Create an account"}
+                {isSignup ? t('switchToSignIn') : t('switchToSignUp')}
               </Text>
             </Pressable>
           </Card>
         )}
 
-        {message && <Text style={[styles.feedback, styles.ok]}>{message}</Text>}
+        {message && (
+          <Text style={[styles.feedback, styles.ok]}>
+            {message === 'confirmEmail' ? t('confirmEmail') : message}
+          </Text>
+        )}
         {error && <Text style={[styles.feedback, styles.err]}>{error}</Text>}
       </View>
     </SafeAreaView>
@@ -230,6 +243,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.primary,
     marginTop: spacing.sm,
+  },
+  headerRight: {
+    alignItems: 'flex-end',
+  },
+  langRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  langBtn: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textMuted,
+    paddingHorizontal: 4,
+  },
+  langBtnActive: {
+    color: colors.primary,
+  },
+  langSep: {
+    fontSize: 12,
+    color: colors.border,
   },
   body: {
     flex: 1,

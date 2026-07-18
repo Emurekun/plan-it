@@ -14,6 +14,7 @@ import MealRecipeModal from '../components/MealRecipeModal';
 import { colors, radii, spacing, typography } from '../theme/theme';
 import { MealType, SpoonMeal } from '../data/spoonacular';
 import { DayPlan, loadDayPlan, removePlannedMeal, isoDate, addDays } from '../storage/dayPlan';
+import { t, useLang, locale } from '../data/i18n';
 
 type Props = {
   onBack: () => void;
@@ -22,23 +23,18 @@ type Props = {
   onPlanDay?: (offset: number) => void;
 };
 
-const SLOTS: { key: MealType; label: string; emoji: string }[] = [
-  { key: 'breakfast', label: 'Breakfast', emoji: '🍳' },
-  { key: 'lunch', label: 'Lunch', emoji: '🥗' },
-  { key: 'dinner', label: 'Dinner', emoji: '🍽️' },
+const SLOTS: { key: MealType; emoji: string }[] = [
+  { key: 'breakfast', emoji: '🍳' },
+  { key: 'lunch', emoji: '🥗' },
+  { key: 'dinner', emoji: '🍽️' },
 ];
 
-const MACROS: { key: 'protein' | 'carbs' | 'fat' | 'fiber'; label: string }[] = [
-  { key: 'protein', label: 'Protein' },
-  { key: 'carbs', label: 'Carbs' },
-  { key: 'fat', label: 'Fat' },
-  { key: 'fiber', label: 'Fiber' },
-];
+const MACROS: ('protein' | 'carbs' | 'fat' | 'fiber')[] = ['protein', 'carbs', 'fat', 'fiber'];
 
 function dayLabel(offset: number, d: Date): string {
-  if (offset === 0) return 'Today';
-  if (offset === 1) return 'Tmrw';
-  return d.toLocaleDateString('en-US', { weekday: 'short' });
+  if (offset === 0) return t('todayChip');
+  if (offset === 1) return t('tmrwChip');
+  return d.toLocaleDateString(locale(), { weekday: 'short' });
 }
 
 function eatenField(
@@ -57,6 +53,7 @@ function eatenField(
 }
 
 export default function PlanScreen({ onBack, onPlanDay }: Props) {
+  const lang = useLang();
   const [dayOffset, setDayOffset] = useState(0);
   const [plan, setPlan] = useState<DayPlan>({});
   const [loading, setLoading] = useState(true);
@@ -87,7 +84,7 @@ export default function PlanScreen({ onBack, onPlanDay }: Props) {
 
   const plannedCount = Object.keys(plan).length;
   const totalCalories = Math.round(eatenField(plan, 'calories'));
-  const dateTitle = selectedDate.toLocaleDateString('en-US', {
+  const dateTitle = selectedDate.toLocaleDateString(locale(), {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
@@ -97,11 +94,11 @@ export default function PlanScreen({ onBack, onPlanDay }: Props) {
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <View>
-          <Text style={typography.label}>YOUR WEEK</Text>
+          <Text style={typography.label}>{t('yourWeek')}</Text>
           <Text style={[typography.title, styles.dateText]}>{dateTitle}</Text>
         </View>
         <Pressable onPress={onBack} hitSlop={12}>
-          <Text style={styles.link}>Done</Text>
+          <Text style={styles.link}>{t('done')}</Text>
         </Pressable>
       </View>
 
@@ -130,28 +127,32 @@ export default function PlanScreen({ onBack, onPlanDay }: Props) {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Card style={styles.totalCard}>
-          <Text style={styles.totalLabel}>CALORIES THIS DAY</Text>
+          <Text style={styles.totalLabel}>{t('caloriesThisDay')}</Text>
           <Text style={styles.totalKcal}>{totalCalories} kcal</Text>
           <View style={styles.macroRow}>
             {MACROS.map((m) => (
-              <View key={m.key} style={styles.macroItem}>
-                <Text style={styles.macroValue}>{eatenField(plan, m.key)}g</Text>
-                <Text style={styles.macroLabel}>{m.label}</Text>
+              <View key={m} style={styles.macroItem}>
+                <Text style={styles.macroValue}>{eatenField(plan, m)}g</Text>
+                <Text style={styles.macroLabel}>{t(m)}</Text>
               </View>
             ))}
           </View>
           <Text style={styles.totalHint}>
             {loading
-              ? 'Loading…'
+              ? t('loading')
               : plannedCount === 0
-                ? 'Nothing planned for this day yet.'
-                : `${plannedCount} of 3 meals planned`}
+                ? t('nothingPlanned')
+                : `${plannedCount} ${t('mealsPlannedOf3')}`}
           </Text>
         </Card>
 
         {onPlanDay && (
           <PrimaryButton
-            label={`Pick meals for ${dayOffset === 0 ? 'today' : dayOffset === 1 ? 'tomorrow' : selectedDate.toLocaleDateString('en-US', { weekday: 'long' })} →`}
+            label={
+              lang === 'tr'
+                ? `${dayOffset === 0 ? 'Bugün' : dayOffset === 1 ? 'Yarın' : selectedDate.toLocaleDateString('tr-TR', { weekday: 'long' })} için yemek seç →`
+                : `Pick meals for ${dayOffset === 0 ? 'today' : dayOffset === 1 ? 'tomorrow' : selectedDate.toLocaleDateString('en-US', { weekday: 'long' })} →`
+            }
             onPress={() => onPlanDay(dayOffset)}
             style={styles.planDayButton}
           />
@@ -166,7 +167,7 @@ export default function PlanScreen({ onBack, onPlanDay }: Props) {
           return (
             <View key={slot.key} style={styles.slot}>
               <Text style={[typography.label, styles.slotLabel]}>
-                {slot.emoji}  {slot.label.toUpperCase()}
+                {slot.emoji}  {t(slot.key).toUpperCase()}
               </Text>
               {entry ? (
                 <Card style={styles.mealCard}>
@@ -178,7 +179,7 @@ export default function PlanScreen({ onBack, onPlanDay }: Props) {
                     )}
                     <View style={styles.mealInfo}>
                       <Text style={styles.mealTitle} numberOfLines={2}>
-                        {entry.meal.title}
+                        {lang === 'tr' && entry.meal.titleTr ? entry.meal.titleTr : entry.meal.title}
                       </Text>
                       <Text style={styles.mealMeta}>
                         {entry.grams} g{kcal !== null ? ` · ${kcal} kcal` : ''}
@@ -186,15 +187,13 @@ export default function PlanScreen({ onBack, onPlanDay }: Props) {
                     </View>
                   </Pressable>
                   <Pressable onPress={() => handleRemove(slot.key)} hitSlop={10} style={styles.removeBtn}>
-                    <Text style={styles.removeText}>Remove</Text>
+                    <Text style={styles.removeText}>{t('remove')}</Text>
                   </Pressable>
                 </Card>
               ) : (
                 <Card style={styles.emptyCard}>
-                  <Text style={styles.emptyText}>Not planned yet</Text>
-                  <Text style={styles.emptyHint}>
-                    Pick a {slot.label.toLowerCase()} on the Today screen, tap “Add to plan” and choose this day.
-                  </Text>
+                  <Text style={styles.emptyText}>{t('notPlannedYet')}</Text>
+                  <Text style={styles.emptyHint}>{t('pickHint')}</Text>
                 </Card>
               )}
             </View>
