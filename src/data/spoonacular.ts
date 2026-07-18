@@ -29,6 +29,7 @@ export type MealNutrition = {
 export type SpoonMeal = {
   id: number;
   title: string;
+  titleTr?: string | null;
   image: string;
   readyInMinutes: number | null;
   servings: number | null;
@@ -42,6 +43,7 @@ export type SpoonMeal = {
 type Row = {
   id: number;
   name: string;
+  name_tr: string | null;
   category: string | null;
   area: string | null;
   thumb: string;
@@ -74,6 +76,7 @@ function mapRow(row: Row): SpoonMeal {
   return {
     id: row.id,
     title: row.name,
+    titleTr: row.name_tr ?? null,
     image: row.thumb,
     readyInMinutes: null,
     servings: 4,
@@ -114,7 +117,7 @@ async function queryRecipes(
   signal?: AbortSignal,
 ): Promise<Row[]> {
   const params = new URLSearchParams();
-  params.set('select', 'id,name,category,area,thumb,instructions,ingredients,ing_text,nutrition');
+  params.set('select', 'id,name,name_tr,category,area,thumb,instructions,ingredients,ing_text,nutrition');
   params.set('meal_types', `cs.{${mealType}}`);
   if (diet !== 'none') params.set('diets', `cs.{${diet}}`);
   for (const a of avoid) {
