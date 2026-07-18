@@ -10,6 +10,7 @@ import AuthScreen from '../screens/AuthScreen';
 import IngredientsScreen from '../screens/IngredientsScreen';
 import { isOnboardingComplete } from '../storage/preferences';
 import { supabase } from '../data/supabaseClient';
+import { initLang } from '../data/i18n';
 import { colors } from '../theme/theme';
 
 type RootStackParamList = {
@@ -34,6 +35,7 @@ export default function RootNavigator() {
       const [{ data }, complete] = await Promise.all([
         supabase.auth.getSession(),
         isOnboardingComplete(),
+        initLang(),
       ]);
       if (!mounted) return;
       setSession(data.session ?? null);
