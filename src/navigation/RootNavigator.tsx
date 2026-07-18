@@ -11,6 +11,7 @@ import IngredientsScreen from '../screens/IngredientsScreen';
 import { isOnboardingComplete } from '../storage/preferences';
 import { supabase } from '../data/supabaseClient';
 import { initLang } from '../data/i18n';
+import { refreshPremium } from '../data/monetization';
 import { colors } from '../theme/theme';
 
 type RootStackParamList = {
@@ -41,9 +42,11 @@ export default function RootNavigator() {
       setSession(data.session ?? null);
       setOnboarded(complete);
       setReady(true);
+      refreshPremium();
     })();
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
+      refreshPremium();
     });
     return () => {
       mounted = false;
