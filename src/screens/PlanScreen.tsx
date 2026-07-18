@@ -11,6 +11,7 @@ import {
 import Card from '../components/Card';
 import PrimaryButton from '../components/PrimaryButton';
 import MealRecipeModal from '../components/MealRecipeModal';
+import AdBanner from '../components/AdBanner';
 import { colors, radii, spacing, typography } from '../theme/theme';
 import { MealType, SpoonMeal } from '../data/spoonacular';
 import { DayPlan, loadDayPlan, removePlannedMeal, isoDate, addDays } from '../storage/dayPlan';
@@ -199,6 +200,8 @@ export default function PlanScreen({ onBack, onPlanDay }: Props) {
             </View>
           );
         })}
+
+        <AdBanner />
       </ScrollView>
 
       <MealRecipeModal visible={recipeVisible} meal={recipeMeal} onClose={() => setRecipeVisible(false)} />

@@ -15,6 +15,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import Card from '../components/Card';
 import PrimaryButton from '../components/PrimaryButton';
 import MealRecipeModal from '../components/MealRecipeModal';
+import AdBanner from '../components/AdBanner';
 import { colors, radii, spacing, typography } from '../theme/theme';
 import { MealType, SpoonMeal, suggestMeals } from '../data/spoonacular';
 import { loadPreferences, resetOnboarding, Preferences } from '../storage/preferences';
@@ -347,6 +348,8 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
           disabled={bucket.loading}
           style={styles.anotherButton}
         />
+
+        <AdBanner />
       </View>
 
       <MealRecipeModal visible={recipeVisible} meal={meal} onClose={() => setRecipeVisible(false)} />
