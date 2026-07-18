@@ -39,6 +39,12 @@ export default function MealRecipeModal({ visible, meal, onClose }: Props) {
   useEffect(() => {
     setTrContent(null);
     if (!visible || !meal || lang !== 'tr') return;
+    // Preferred source: the pre-translated content stored in our database.
+    if (meal.tr && meal.tr.ingredients?.length) {
+      setTrContent(meal.tr);
+      return;
+    }
+    // Fallback: translate on the fly (older cached plans without db content).
     let active = true;
     setTranslating(true);
     translateRecipeTr(meal.id, meal.ingredients, meal.steps)
