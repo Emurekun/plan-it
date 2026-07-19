@@ -250,19 +250,26 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
             </Pressable>
           </View>
           {nickname && <Text style={styles.nickname}>👤 {nickname}</Text>}
-          <Pressable onPress={onOpenPlan} hitSlop={8}>
-            <Text style={styles.link}>{t('myPlan')}</Text>
-          </Pressable>
-          <Pressable onPress={onChangeIngredients} hitSlop={8}>
-            <Text style={styles.editLink}>{t('changeIngredients')}</Text>
-          </Pressable>
-          <Pressable onPress={handleEditPreferences} hitSlop={8}>
-            <Text style={styles.editLink}>{t('editPrefs')}</Text>
-          </Pressable>
-          <Pressable onPress={onOpenAccount} hitSlop={8}>
-            <Text style={styles.editLink}>{t('account')}</Text>
-          </Pressable>
         </View>
+      </View>
+
+      <View style={styles.actionRow}>
+        <Pressable onPress={onOpenPlan} style={[styles.actionBtn, styles.actionBtnPrimary]}>
+          <Text style={styles.actionIcon}>📅</Text>
+          <Text style={[styles.actionText, styles.actionTextPrimary]}>{t('myPlanBtn')}</Text>
+        </Pressable>
+        <Pressable onPress={onChangeIngredients} style={styles.actionBtn}>
+          <Text style={styles.actionIcon}>🧺</Text>
+          <Text style={styles.actionText}>{t('ingredientsBtn')}</Text>
+        </Pressable>
+        <Pressable onPress={handleEditPreferences} style={styles.actionBtn}>
+          <Text style={styles.actionIcon}>⚙️</Text>
+          <Text style={styles.actionText}>{t('prefsBtn')}</Text>
+        </Pressable>
+        <Pressable onPress={onOpenAccount} style={styles.actionBtn}>
+          <Text style={styles.actionIcon}>👤</Text>
+          <Text style={styles.actionText}>{t('account')}</Text>
+        </Pressable>
       </View>
 
       <View style={styles.body}>
@@ -459,6 +466,40 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.text,
     marginBottom: spacing.xs,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  actionBtn: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingVertical: spacing.sm,
+  },
+  actionBtnPrimary: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  actionIcon: {
+    fontSize: 18,
+  },
+  actionText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.text,
+    marginTop: 2,
+  },
+  actionTextPrimary: {
+    color: '#FFFFFF',
   },
   dateText: {
     fontSize: 24,
