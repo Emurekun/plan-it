@@ -174,6 +174,9 @@ const S: Record<string, { en: string; tr: string }> = {
   },
   deleteFail: { en: 'Could not delete account.', tr: 'Hesap silinemedi.' },
   attribution: { en: 'Recipe data & images: TheMealDB', tr: 'Tarif verisi ve görseller: TheMealDB' },
+  myPlanBtn: { en: 'My Plan', tr: 'Planım' },
+  ingredientsBtn: { en: 'Ingredients', tr: 'Malzemeler' },
+  prefsBtn: { en: 'Preferences', tr: 'Tercihler' },
 };
 
 export function t(key: string): string {
