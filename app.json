@@ -19,7 +19,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.emurekun.planit",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
