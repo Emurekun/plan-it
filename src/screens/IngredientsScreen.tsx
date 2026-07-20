@@ -12,7 +12,7 @@ import {
 import Chip from '../components/Chip';
 import PrimaryButton from '../components/PrimaryButton';
 import { colors, radii, spacing, typography } from '../theme/theme';
-import { popularIngredients, searchIngredients } from '../data/ingredients';
+import { popularIngredients, searchIngredients, ingredientLabel } from '../data/ingredients';
 import { loadPreferences, savePreferences, Preferences } from '../storage/preferences';
 import { t, useLang } from '../data/i18n';
 
@@ -24,7 +24,7 @@ type Props = {
 // changes day to day) without redoing the whole onboarding. Diet and avoided
 // ingredients stay as they are.
 export default function IngredientsScreen({ onBack }: Props) {
-  useLang();
+  const lang = useLang();
   const [prefs, setPrefs] = useState<Preferences | null>(null);
   const [have, setHave] = useState<string[]>([]);
   const [query, setQuery] = useState('');
@@ -95,7 +95,7 @@ export default function IngredientsScreen({ onBack }: Props) {
         {have.length > 0 && (
           <View style={styles.selectedWrap}>
             {have.map((name) => (
-              <Chip key={name} label={`${name}  ✕`} selected onPress={() => toggle(name)} />
+              <Chip key={name} label={`${ingredientLabel(name, lang)}  ✕`} selected onPress={() => toggle(name)} />
             ))}
           </View>
         )}
@@ -105,7 +105,7 @@ export default function IngredientsScreen({ onBack }: Props) {
         </Text>
         <View style={styles.optionList}>
           {suggestions.map((name) => (
-            <Chip key={name} label={name} selected={false} onPress={() => toggle(name)} />
+            <Chip key={name} label={ingredientLabel(name, lang)} selected={false} onPress={() => toggle(name)} />
           ))}
           {query.trim() && suggestions.length === 0 && (
             <Text style={[typography.subtitle, styles.noMatch]}>{t('noIngMatch')}</Text>
