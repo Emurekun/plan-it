@@ -12,7 +12,7 @@ import PrimaryButton from '../../components/PrimaryButton';
 import Chip from '../../components/Chip';
 import { colors, radii, spacing, typography } from '../../theme/theme';
 import { DIET_OPTIONS } from '../../data/options';
-import { popularIngredients, searchIngredients } from '../../data/ingredients';
+import { popularIngredients, searchIngredients, ingredientLabel } from '../../data/ingredients';
 import { DietType, savePreferences } from '../../storage/preferences';
 import { t, useLang } from '../../data/i18n';
 
@@ -91,7 +91,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
             {selected.map((name) => (
               <Chip
                 key={name}
-                label={`${name}  ✕`}
+                label={`${ingredientLabel(name, lang)}  ✕`}
                 selected
                 onPress={() => toggle(selected, setSelected, name)}
               />
@@ -106,7 +106,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
           {suggestions.map((name) => (
             <Chip
               key={name}
-              label={name}
+              label={ingredientLabel(name, lang)}
               selected={false}
               onPress={() => toggle(selected, setSelected, name)}
             />
