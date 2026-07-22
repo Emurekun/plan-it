@@ -11,9 +11,9 @@ import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabaseClient';
 
-// Master switch for ads. Keep false until AdMob is integrated and the store
-// listing declares ads.
-export const ADS_ENABLED = false;
+// Master switch for ads. Enabled now that AdMob interstitials are integrated
+// (Android). Ads are hidden for premium (ad-free) subscribers.
+export const ADS_ENABLED = true;
 
 const CACHE_KEY = 'planit.premiumUntil';
 let premiumUntil: number | null = null;
