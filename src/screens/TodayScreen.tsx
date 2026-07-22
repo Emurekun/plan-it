@@ -22,6 +22,7 @@ import { loadPreferences, resetOnboarding, Preferences } from '../storage/prefer
 import { setPlannedMeal, isoDate, addDays } from '../storage/dayPlan';
 import { supabase } from '../data/supabaseClient';
 import { t, useLang, setLang, locale } from '../data/i18n';
+import { initAds, maybeShowInterstitial } from '../data/ads';
 
 type Props = {
   onEditPreferences: () => void;
@@ -131,6 +132,7 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
       setPrefsLoaded(true);
       if (prefs) loadBatch('breakfast', prefs, 0, true);
     })();
+    initAds();
   }, [loadBatch]);
 
   const prefsSigRef = useRef<string>('');
@@ -177,6 +179,8 @@ export default function TodayScreen({ onEditPreferences, onOpenPlan, onOpenAccou
 
   const handleAnother = () => {
     if (!preferences) return;
+    // Full-screen ad at a natural break (frequency-capped, premium-exempt).
+    maybeShowInterstitial();
     const b = buckets[mealType];
     if (b.index < b.meals.length - 1) {
       setBuckets((prev) => ({ ...prev, [mealType]: { ...prev[mealType], index: prev[mealType].index + 1 } }));
